@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>研经工作台 | Bible Study Workbench</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="theme-light font-m" data-layout="1">
+
+  <!-- Top App Navigation Bar -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="brand">
+        <i class="fa-solid fa-book-bible brand-icon"></i>
+        <div class="brand-text">
+          <span class="brand-title">研经工作台</span>
+          <span class="brand-subtitle">Bible Study Workbench</span>
+        </div>
+      </div>
+
+      <!-- Book, Chapter, Verse selector -->
+      <div class="nav-controls">
+        <select id="bookSelect" class="select-input" title="选择书卷"></select>
+        <select id="chapterSelect" class="select-input select-num" title="选择章节"></select>
+        <select id="verseSelect" class="select-input select-num" title="选择经节"></select>
+        <button id="btnPrevChapter" class="btn-icon" title="上一章 (快捷键: [ 或 ←)"><i class="fa-solid fa-chevron-left"></i></button>
+        <button id="btnNextChapter" class="btn-icon" title="下一章 (快捷键: ] 或 →)"><i class="fa-solid fa-chevron-right"></i></button>
+      </div>
+    </div>
+
+    <!-- Center layout controls -->
+    <div class="header-center">
+      <div class="layout-toggle-group">
+        <button class="btn-toggle" id="toggleOutlineBtn" title="显示/隐藏大纲栏"><i class="fa-solid fa-list-tree"></i> 大纲</button>
+        <button class="btn-toggle" id="toggleCommentaryBtn" title="显示/隐藏导论与注释栏"><i class="fa-solid fa-book-open-reader"></i> 导论/注释</button>
+        <button class="btn-toggle" id="toggleDrawerBtn" title="显示/隐藏检索与原文字典"><i class="fa-solid fa-magnifying-glass"></i> 检索/词典</button>
+      </div>
+
+      <div class="workspace-modes" title="工作区预设模式">
+        <span class="mode-label">预设:</span>
+        <button class="btn-mode active" data-mode="1" title="模式 1: 经典三栏 (大纲 20% | 经文 50% | 注释 30%)">1</button>
+        <button class="btn-mode" data-mode="2" title="模式 2: 研读双栏 (经文 45% | 注释 55%)">2</button>
+        <button class="btn-mode" data-mode="3" title="模式 3: 专注注释 (注释导论全宽)">3</button>
+        <button class="btn-mode" data-mode="4" title="模式 4: 多译本并排比对 (Parallel Bible)">4</button>
+      </div>
+    </div>
+
+    <!-- Right utility controls -->
+    <div class="header-right">
+      <div class="theme-controls">
+        <button id="btnFontDec" class="btn-icon btn-sm" title="缩小字号">A-</button>
+        <button id="btnFontInc" class="btn-icon btn-sm" title="放大字号">A+</button>
+        <div class="theme-dropdown-wrap">
+          <select id="themeSelect" class="select-input select-sm" title="阅读主题">
+            <option value="light">☀️ 浅色 (Light)</option>
+            <option value="sepia">📜 羊皮纸 (Sepia)</option>
+            <option value="dark">🌙 暗黑 (Dark)</option>
+          </select>
+        </div>
+      </div>
+
+      <button id="btnOpenManageModal" class="btn btn-primary" title="导入圣经译本、注释书与资源管理">
+        <i class="fa-solid fa-cloud-arrow-up"></i> <span>管理与导入</span>
+      </button>
+
+      <a href="https://github.com/liyanngai1980/bible-workbench" target="_blank" class="btn-icon" title="查看 GitHub 开源仓库">
+        <i class="fa-brands fa-github"></i>
+      </a>
+    </div>
+  </header>
+
+  <!-- Main Multi-Panel Workspace -->
+  <main class="workbench-container" id="workbenchContainer">
+
+    <!-- Left Panel: Outlines, Cross References, Background Charts -->
+    <aside class="panel left-panel" id="leftPanel">
+      <div class="panel-header">
+        <div class="panel-tabs">
+          <button class="tab-btn active" data-left-tab="studyOutline">研读大纲</button>
+          <button class="tab-btn" data-left-tab="structOutline">结构大纲</button>
+          <button class="tab-btn" data-left-tab="crossRef">串珠经文</button>
+          <button class="tab-btn" data-left-tab="backgroundCharts">图表与背景</button>
+        </div>
+      </div>
+      <div class="panel-body outline-content" id="leftPanelBody">
+        <!-- Rendered dynamically -->
+      </div>
+    </aside>
+
+    <!-- Center Panel: Bible Texts & Multi-Version Parallel Views -->
+    <section class="panel center-panel" id="centerPanel">
+      <div class="panel-header center-panel-header">
+        <div class="version-tabs-scroll" id="versionTabsContainer">
+          <!-- Dynamic version tabs (CUV, CNV, NET, CSB, NASB, ESV, OUS, Parallel + User Imported) -->
+        </div>
+        <div class="header-tools">
+          <button id="btnParallelConfig" class="btn btn-sm btn-ghost" title="配置并排比对的译本" style="display:none;">
+            <i class="fa-solid fa-sliders"></i> 并排配置
+          </button>
+        </div>
+      </div>
+
+      <!-- Main Bible Reading View -->
+      <div class="panel-body bible-body" id="bibleView">
+        <div class="passage-header" id="passageTitleHeader">
+          <h2 id="currentPassageTitle">约翰三书 第 1 章</h2>
+          <span class="passage-meta" id="currentPassageMeta">现代标点和合本 (CUV)</span>
+        </div>
+        <div class="verses-list" id="versesContainer">
+          <!-- Verses rendered here -->
+        </div>
+      </div>
+
+      <!-- Bottom Drawer: Search Engine & Strong's Lexicon Panel -->
+      <div class="bottom-drawer" id="bottomDrawer">
+        <div class="drawer-header">
+          <div class="drawer-tabs">
+            <button class="drawer-tab-btn active" data-drawer-tab="search"><i class="fa-solid fa-magnifying-glass"></i> 全文检索</button>
+            <button class="drawer-tab-btn" data-drawer-tab="lexicon"><i class="fa-solid fa-spell-check"></i> 原文字典 (Strong's Lexicon)</button>
+          </div>
+          <div class="drawer-actions">
+            <button id="btnCloseDrawer" class="btn-icon btn-sm" title="收起底栏"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+        </div>
+        <div class="drawer-body">
+          <!-- Search View -->
+          <div class="drawer-view active" id="drawerViewSearch">
+            <div class="search-bar">
+              <input type="text" id="searchInput" class="search-input" placeholder="输入经文关键字（如：真理、该犹、爱、善）或 Strong 编号（如 G225）回车检索...">
+              <select id="searchVersionSelect" class="select-input select-sm"></select>
+              <button id="btnRunSearch" class="btn btn-primary btn-sm"><i class="fa-solid fa-search"></i> 查找</button>
+            </div>
+            <div class="search-results-stats" id="searchStats">请输入关键字进行检索</div>
+            <div class="search-results-list" id="searchResultsList"></div>
+          </div>
+
+          <!-- Strong's Lexicon View -->
+          <div class="drawer-view" id="drawerViewLexicon">
+            <div class="lexicon-content" id="lexiconContent">
+              <div class="lexicon-placeholder">
+                <i class="fa-solid fa-hand-pointer"></i> 在经文汇编译本中点击任意 Strong's 原文编号（如 <code>G4245</code>, <code>G27</code>, <code>G225</code>）查看原文形态与词典详解。
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Panel: Book Introductions & Verse-by-Verse Commentaries -->
+    <aside class="panel right-panel" id="rightPanel">
+      <!-- Top Half: Book Introduction -->
+      <div class="right-panel-section intro-section">
+        <div class="panel-header">
+          <span class="section-title"><i class="fa-solid fa-compass"></i> 书卷导论与历史背景</span>
+          <div class="intro-source-badge" id="introAuthorBadge">唐纳德·伯迪克</div>
+        </div>
+        <div class="panel-body intro-body" id="introContainer">
+          <!-- Book Introduction rendered here -->
+        </div>
+      </div>
+
+      <!-- Bottom Half: Verse-by-Verse Commentary -->
+      <div class="right-panel-section commentary-section">
+        <div class="panel-header">
+          <div class="panel-tabs" id="commentaryTabsContainer">
+            <button class="tab-btn active" data-comm-id="burdick">伯迪克注释</button>
+            <button class="tab-btn" data-comm-id="believers">信徒圣经注释</button>
+            <button class="tab-btn" data-comm-id="macarthur">讲道与解经</button>
+            <!-- User imported commentaries dynamically added here -->
+          </div>
+          <div class="active-verse-indicator" id="activeVerseIndicator" title="当前聚焦节">
+            第 1 节
+          </div>
+        </div>
+        <div class="panel-body commentary-body" id="commentaryContainer">
+          <!-- Verse commentaries rendered here -->
+        </div>
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- Modal: Import & Resource Manager -->
+  <div class="modal-backdrop" id="manageModal" style="display:none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i class="fa-solid fa-sliders"></i> 版本与注释管理中心 (Resource Manager)
+        </div>
+        <button class="btn-icon" id="btnCloseManageModal"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="modal-nav">
+          <button class="modal-nav-btn active" data-modal-tab="importBible"><i class="fa-solid fa-file-import"></i> 导入圣经译本</button>
+          <button class="modal-nav-btn" data-modal-tab="importComm"><i class="fa-solid fa-book-bookmark"></i> 导入解经注释</button>
+          <button class="modal-nav-btn" data-modal-tab="manageModules"><i class="fa-solid fa-cubes"></i> 已安装资源管理</button>
+          <button class="modal-nav-btn" data-modal-tab="backup"><i class="fa-solid fa-hard-drive"></i> 数据备份与迁移</button>
+        </div>
+
+        <div class="modal-tab-content">
+          <!-- Tab 1: Import Bible Version -->
+          <div class="modal-tab-pane active" id="modalPane-importBible">
+            <div class="import-card">
+              <h3><i class="fa-solid fa-cloud-arrow-up"></i> 导入新圣经译本</h3>
+              <p class="text-secondary">
+                支持导入你自己的圣经译本（如吕振中译本、思高本、恢复本、现代中文译本等）。数据将自动保存在你浏览器的 IndexedDB 本地数据库中，完全离线可用，持久保留。
+              </p>
+
+              <div class="template-download-box">
+                <span>模板下载: </span>
+                <button id="btnDownloadBibleJsonTemplate" class="btn btn-sm btn-ghost"><i class="fa-solid fa-file-code"></i> 下载标准 JSON 模板</button>
+                <button id="btnDownloadBibleCsvTemplate" class="btn btn-sm btn-ghost"><i class="fa-solid fa-file-csv"></i> 下载标准 CSV 模板</button>
+              </div>
+
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>译本唯一标识 ID (英文字母/数字):</label>
+                  <input type="text" id="importBibleId" class="text-input" placeholder="例如: LZZ, RECOVERY, KJV2">
+                </div>
+                <div class="form-group">
+                  <label>译本全称 (Display Name):</label>
+                  <input type="text" id="importBibleName" class="text-input" placeholder="例如: 吕振中译本">
+                </div>
+                <div class="form-group">
+                  <label>译本简称 (Abbreviation):</label>
+                  <input type="text" id="importBibleAbbr" class="text-input" placeholder="例如: 吕振中">
+                </div>
+                <div class="form-group">
+                  <label>数据格式类型:</label>
+                  <select id="importBibleFormat" class="select-input">
+                    <option value="json">标准 JSON 格式 (推荐)</option>
+                    <option value="csv">CSV 表格格式 (书卷,章,节,经文)</option>
+                    <option value="lines">单行文本格式 (如: 约三 1:1 经文内容)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="upload-dropzone" id="bibleDropzone">
+                <i class="fa-solid fa-file-arrow-up dropzone-icon"></i>
+                <div class="dropzone-text">点击选择文件 或 将 JSON / CSV 文件拖拽至此处</div>
+                <input type="file" id="bibleFileInput" accept=".json,.csv,.txt" style="display:none;">
+              </div>
+
+              <div class="form-group" style="margin-top:12px;">
+                <label>或直接在下方文本框粘贴经文数据:</label>
+                <textarea id="biblePasteArea" class="code-textarea" rows="6" placeholder='可直接粘贴 JSON 或 CSV 文本...'></textarea>
+              </div>
+
+              <div class="modal-footer-actions">
+                <button id="btnParseBible" class="btn btn-primary"><i class="fa-solid fa-check"></i> 解析并导入该译本</button>
+                <div id="bibleImportStatus" class="status-msg"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 2: Import Commentary -->
+          <div class="modal-tab-pane" id="modalPane-importComm">
+            <div class="import-card">
+              <h3><i class="fa-solid fa-pen-nib"></i> 导入自定义解经注释与导论</h3>
+              <p class="text-secondary">
+                支持导入神学家的专著解经注释、牧者讲道讲章、或你自己的研经笔记。
+              </p>
+
+              <div class="template-download-box">
+                <span>模板下载: </span>
+                <button id="btnDownloadCommJsonTemplate" class="btn btn-sm btn-ghost"><i class="fa-solid fa-file-code"></i> 下载注释 JSON 模板</button>
+              </div>
+
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>注释书唯一标识 ID:</label>
+                  <input type="text" id="importCommId" class="text-input" placeholder="例如: calvin-comm, my-notes">
+                </div>
+                <div class="form-group">
+                  <label>注释书名称 (Title):</label>
+                  <input type="text" id="importCommTitle" class="text-input" placeholder="例如: 加尔文圣经注释">
+                </div>
+                <div class="form-group">
+                  <label>作者/出处 (Author):</label>
+                  <input type="text" id="importCommAuthor" class="text-input" placeholder="例如: 约翰·加尔文">
+                </div>
+                <div class="form-group">
+                  <label>覆盖书卷:</label>
+                  <select id="importCommBookSelect" class="select-input"></select>
+                </div>
+              </div>
+
+              <div class="upload-dropzone" id="commDropzone">
+                <i class="fa-solid fa-file-lines dropzone-icon"></i>
+                <div class="dropzone-text">点击选择文件 或 将注释 JSON 文件拖拽至此处</div>
+                <input type="file" id="commFileInput" accept=".json,.txt" style="display:none;">
+              </div>
+
+              <div class="form-group" style="margin-top:12px;">
+                <label>或直接在下方粘贴注释 JSON 数据:</label>
+                <textarea id="commPasteArea" class="code-textarea" rows="6" placeholder='粘贴注释 JSON 文本...'></textarea>
+              </div>
+
+              <div class="modal-footer-actions">
+                <button id="btnParseComm" class="btn btn-primary"><i class="fa-solid fa-check"></i> 解析并导入该注释</button>
+                <div id="commImportStatus" class="status-msg"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 3: Manage Installed Modules -->
+          <div class="modal-tab-pane" id="modalPane-manageModules">
+            <div class="import-card">
+              <h3><i class="fa-solid fa-layer-group"></i> 当前已安装的圣经译本</h3>
+              <div class="installed-list" id="installedBiblesList"></div>
+
+              <h3 style="margin-top:24px;"><i class="fa-solid fa-book-journal-whills"></i> 当前已安装的注释书</h3>
+              <div class="installed-list" id="installedCommsList"></div>
+            </div>
+          </div>
+
+          <!-- Tab 4: Backup & Restore -->
+          <div class="modal-tab-pane" id="modalPane-backup">
+            <div class="import-card">
+              <h3><i class="fa-solid fa-cloud-arrow-down"></i> 导出完整数据备份</h3>
+              <p class="text-secondary">
+                将你在本地工作台中导入的所有自定义译本、注释和配置一键打包为 JSON 文件，随时可在其他电脑或浏览器中一键恢复。
+              </p>
+              <button id="btnExportAllData" class="btn btn-primary"><i class="fa-solid fa-download"></i> 导出整站用户数据备份 (.json)</button>
+
+              <h3 style="margin-top:28px;"><i class="fa-solid fa-rotate-left"></i> 导入备份数据包</h3>
+              <p class="text-secondary">
+                选择之前导出的备份 JSON 文件进行还原。
+              </p>
+              <input type="file" id="restoreFileInput" accept=".json" style="margin-bottom:10px;">
+              <button id="btnRestoreAllData" class="btn btn-secondary"><i class="fa-solid fa-upload"></i> 执行还原</button>
+              <button id="btnResetToDefaults" class="btn btn-danger" style="margin-left:12px;"><i class="fa-solid fa-trash-can"></i> 清除自定义数据恢复默认</button>
+              <div id="backupStatus" class="status-msg"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Strong's Concordance Quick Popup -->
+  <div class="popover-strong" id="strongPopover" style="display:none;">
+    <div class="popover-header">
+      <span class="strong-id-badge" id="popoverStrongBadge">G225</span>
+      <span class="strong-original-word" id="popoverOriginalWord">ἀλήθεια</span>
+      <button class="popover-close-btn" id="btnCloseStrongPopover"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="popover-body" id="popoverBody">
+      <!-- Strong details -->
+    </div>
+    <div class="popover-footer">
+      <button class="btn btn-xs btn-primary" id="btnPopoverSearch"><i class="fa-solid fa-magnifying-glass"></i> 在圣经中查找此原文</button>
+      <button class="btn btn-xs btn-ghost" id="btnPopoverDetails"><i class="fa-solid fa-arrow-up-right-from-square"></i> 在词典抽屉中打开</button>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="app.js"></script>
+</body>
+</html>
