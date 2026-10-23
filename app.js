@@ -2671,6 +2671,13 @@ class BibleWorkbenchApp {
     this.ttsPaused = false;
     this.ttsCurrentVerse = null;
     this.ttsRate = 1.0;
+
+    // Scroll Synchronization state
+    this.syncScrollEnabled = true;
+    this.isSyncScrollLock = false;
+
+    // Drag-and-drop state
+    this.draggedPanel = null;
   }
 
   async init() {
@@ -2688,7 +2695,7 @@ class BibleWorkbenchApp {
 
     this.allBibleVersions = [...BUILTIN_BIBLES, ...this.customBibles];
 
-    // 2. Load LocalStorage preferences
+    // 2. Load LocalStorage preferences & panel layout
     this.loadSavedPreferences();
 
     // 3. Setup Top Selectors
@@ -2696,8 +2703,10 @@ class BibleWorkbenchApp {
     this.updateChapterSelect();
     this.updateVerseSelect();
 
-    // 4. Event Listeners
+    // 4. Event Listeners & Feature Modules
     this.setupEventListeners();
+    this.setupPanelDragAndDrop();
+    this.setupScrollSync();
     this.setupQuickJumper();
     this.setupFloatingVerseBar();
     this.setupAudioTts();
@@ -2705,9 +2714,13 @@ class BibleWorkbenchApp {
     this.setupNoteEditor();
     this.setupShareCard();
 
-    // 5. Initial Render
+    // 5. Restore custom panel layout order
+    this.restoreCustomPanelLayout();
+
+    // 6. Initial Render
     this.renderVersionTabs();
     this.renderPassage();
+    this.renderParallelPassage();
     this.renderLeftPanel();
     this.renderBookIntro();
     this.renderCommentaryTabs();
@@ -2747,6 +2760,7 @@ class BibleWorkbenchApp {
       this.updateChapterSelect();
       this.updateVerseSelect();
       this.renderPassage();
+      this.renderParallelPassage();
       this.renderLeftPanel();
       this.renderBookIntro();
       this.renderCommentary();
@@ -2783,7 +2797,6 @@ class BibleWorkbenchApp {
   }
 
   getVersesCountForChapter(bookNo, chapNo) {
-    // Check if verses exist in CUV
     const cuvMap = this.getVersesMap("CUV");
     let count = 0;
     for (let v = 1; v <= 176; v++) {
@@ -2791,7 +2804,6 @@ class BibleWorkbenchApp {
     }
     if (count > 0) return count;
 
-    // Common landmark chapters
     if (bookNo === 1 && chapNo === 1) return 31;
     if (bookNo === 19 && chapNo === 23) return 6;
     if (bookNo === 43 && chapNo === 1) return 51;
@@ -2801,7 +2813,7 @@ class BibleWorkbenchApp {
     if (bookNo === 64 && chapNo === 1) return 15;
     if (bookNo === 65 && chapNo === 1) return 25;
     if (bookNo === 66 && chapNo === 21) return 27;
-    return 25; // fallback
+    return 25;
   }
 
   renderVersionTabs() {
@@ -2822,29 +2834,10 @@ class BibleWorkbenchApp {
       });
       container.appendChild(btn);
     });
-
-    // Parallel View Tab
-    const parallelBtn = document.createElement("button");
-    parallelBtn.className = `version-tab tab-parallel ${this.activeVersion === "PARALLEL" ? "active" : ""}`;
-    parallelBtn.innerHTML = `<i class="fa-solid fa-table-columns"></i> 并排比对`;
-    parallelBtn.title = "多译本跨列逐节并排比对";
-    parallelBtn.addEventListener("click", () => {
-      this.activeVersion = "PARALLEL";
-      document.querySelectorAll(".version-tab").forEach(b => b.classList.remove("active"));
-      parallelBtn.classList.add("active");
-      this.renderPassage();
-    });
-    container.appendChild(parallelBtn);
-
-    // Toggle parallel config button visibility
-    const cfgBtn = document.getElementById("btnParallelConfig");
-    if (cfgBtn) {
-      cfgBtn.style.display = (this.activeVersion === "PARALLEL" || this.layoutMode === 4) ? "inline-flex" : "none";
-    }
   }
 
   // =========================================================
-  // Passage & Verses Rendering
+  // Passage & Verses Rendering (Primary Scripture Panel)
   // =========================================================
   renderPassage() {
     const book = BOOK_MAP.get(this.currentBook);
@@ -2854,33 +2847,18 @@ class BibleWorkbenchApp {
 
     titleEl.textContent = `${book ? book.name : ""} 第 ${this.currentChapter} 章`;
 
-    const cfgBtn = document.getElementById("btnParallelConfig");
-    if (cfgBtn) {
-      cfgBtn.style.display = (this.activeVersion === "PARALLEL" || this.layoutMode === 4) ? "inline-flex" : "none";
-    }
-
-    // Parallel View Mode
-    if (this.activeVersion === "PARALLEL" || this.layoutMode === 4) {
-      metaEl.textContent = `多译本并排比对模式 (${this.parallelVersions.join(", ")})`;
-      this.renderParallelPassage(container);
-      return;
-    }
-
-    // Single Version Mode
     const verObj = this.allBibleVersions.find(v => v.id === this.activeVersion);
     metaEl.textContent = verObj ? `${verObj.name} (${verObj.id})` : this.activeVersion;
 
     const versesMap = this.getVersesMap(this.activeVersion);
     const totalVerses = this.getVersesCountForChapter(this.currentBook, this.currentChapter);
 
-    // Check if verses are present for this chapter
     const firstKey = `${this.currentBook}-${this.currentChapter}-1`;
     const hasLocalVerses = !!versesMap[firstKey];
 
     container.innerHTML = "";
 
     if (!hasLocalVerses) {
-      // Render Online Chapter Loader Banner
       const card = document.createElement("div");
       card.className = "online-loader-card";
       card.innerHTML = `
@@ -2920,7 +2898,6 @@ class BibleWorkbenchApp {
       row.id = `verse-row-${v}`;
       row.dataset.verseNum = v;
 
-      // Handle Strong's tag formatting if OUS version
       let formattedText = text;
       if (this.activeVersion === "OUS") {
         formattedText = text.replace(/\[(G\d+|H\d+)\]/g, (match, p1) => {
@@ -2928,7 +2905,6 @@ class BibleWorkbenchApp {
         });
       }
 
-      // Note icon indicator
       const noteBadge = noteObj ? `<span class="note-indicator" title="此节有研经札记: ${escapeHtml(noteObj.text.slice(0, 40))}..."><i class="fa-solid fa-pen-to-square"></i></span>` : "";
 
       row.innerHTML = `
@@ -2950,8 +2926,14 @@ class BibleWorkbenchApp {
     }
   }
 
-  renderParallelPassage(container) {
+  // =========================================================
+  // Parallel Comparison Rendering (Panel 3: 对照经文)
+  // =========================================================
+  renderParallelPassage() {
+    const container = document.getElementById("parallelView");
+    if (!container) return;
     container.innerHTML = "";
+
     const compareVersions = this.parallelVersions || ["CUV", "CNV", "CSB", "ESV"];
     const totalVerses = this.getVersesCountForChapter(this.currentBook, this.currentChapter);
 
@@ -2960,7 +2942,7 @@ class BibleWorkbenchApp {
 
     // Header
     const thead = document.createElement("thead");
-    let headerHtml = "<tr><th style='width:40px;'>节</th>";
+    let headerHtml = "<tr><th style='width:36px; text-align:center;'>节</th>";
     compareVersions.forEach(vid => {
       const verObj = this.allBibleVersions.find(v => v.id === vid);
       headerHtml += `<th>${verObj ? verObj.name : vid}</th>`;
@@ -2978,8 +2960,9 @@ class BibleWorkbenchApp {
       const tr = document.createElement("tr");
       tr.className = `${v === this.currentVerse ? "active" : ""} ${hlObj ? "hl-" + hlObj.color : ""}`;
       tr.id = `parallel-row-${v}`;
+      tr.dataset.verseNum = v;
 
-      let trHtml = `<td><span class="parallel-verse-num">${v}</span></td>`;
+      let trHtml = `<td style="text-align:center;"><span class="parallel-verse-num">${v}</span></td>`;
       compareVersions.forEach(vid => {
         const vMap = this.getVersesMap(vid);
         const text = vMap[key] || "—";
@@ -3016,6 +2999,10 @@ class BibleWorkbenchApp {
     const activeRow = document.getElementById(`verse-row-${v}`);
     if (activeRow) activeRow.classList.add("active");
 
+    document.querySelectorAll(".parallel-table tr").forEach(r => r.classList.remove("active"));
+    const parallelRow = document.getElementById(`parallel-row-${v}`);
+    if (parallelRow) parallelRow.classList.add("active");
+
     const ind = document.getElementById("activeVerseIndicator");
     if (ind) ind.textContent = `第 ${v} 节`;
 
@@ -3027,8 +3014,345 @@ class BibleWorkbenchApp {
     const target = document.getElementById(`comm-verse-${v}`);
     if (target) {
       target.classList.add("active-commentary");
-      target.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
+  }
+
+  // =========================================================
+  // Requirement 2: Bidirectional Scroll Synchronization & Toggle
+  // =========================================================
+  setupScrollSync() {
+    const scriptureBody = document.getElementById("bibleView");
+    const parallelBody = document.getElementById("parallelView");
+    const commentaryBody = document.getElementById("commentaryContainer");
+    const toggleBtn = document.getElementById("btnSyncScrollToggle");
+
+    if (toggleBtn) {
+      toggleBtn.addEventListener("click", () => this.toggleSyncScroll());
+    }
+
+    const onScriptureScroll = () => {
+      if (!this.syncScrollEnabled || this.isSyncScrollLock) return;
+      this.isSyncScrollLock = true;
+      requestAnimationFrame(() => {
+        const topVerse = this.getTopVisibleVerse(scriptureBody);
+        if (topVerse) {
+          this.scrollParallelToVerse(topVerse);
+          this.scrollCommentaryToVerse(topVerse);
+          this.updateActiveVerseBadgeOnly(topVerse);
+        }
+        setTimeout(() => { this.isSyncScrollLock = false; }, 60);
+      });
+    };
+
+    const onParallelScroll = () => {
+      if (!this.syncScrollEnabled || this.isSyncScrollLock) return;
+      this.isSyncScrollLock = true;
+      requestAnimationFrame(() => {
+        const topVerse = this.getTopVisibleParallelVerse(parallelBody);
+        if (topVerse) {
+          this.scrollScriptureToVerse(topVerse);
+          this.scrollCommentaryToVerse(topVerse);
+          this.updateActiveVerseBadgeOnly(topVerse);
+        }
+        setTimeout(() => { this.isSyncScrollLock = false; }, 60);
+      });
+    };
+
+    const onCommentaryScroll = () => {
+      if (!this.syncScrollEnabled || this.isSyncScrollLock) return;
+      this.isSyncScrollLock = true;
+      requestAnimationFrame(() => {
+        const topVerse = this.getTopVisibleCommentaryVerse(commentaryBody);
+        if (topVerse) {
+          this.scrollScriptureToVerse(topVerse);
+          this.scrollParallelToVerse(topVerse);
+          this.updateActiveVerseBadgeOnly(topVerse);
+        }
+        setTimeout(() => { this.isSyncScrollLock = false; }, 60);
+      });
+    };
+
+    if (scriptureBody) scriptureBody.addEventListener("scroll", onScriptureScroll, { passive: true });
+    if (parallelBody) parallelBody.addEventListener("scroll", onParallelScroll, { passive: true });
+    if (commentaryBody) commentaryBody.addEventListener("scroll", onCommentaryScroll, { passive: true });
+
+    this.updateSyncScrollUi();
+  }
+
+  toggleSyncScroll() {
+    this.syncScrollEnabled = !this.syncScrollEnabled;
+    localStorage.setItem("bible_workbench_sync_scroll", this.syncScrollEnabled ? "true" : "false");
+    this.updateSyncScrollUi();
+    showToast(this.syncScrollEnabled ? "已开启经文、对照与注释同步滚动 🔗" : "已解除同步，各窗口独立滚动 🔓", this.syncScrollEnabled ? "🔗" : "🔓");
+  }
+
+  updateSyncScrollUi() {
+    const btn = document.getElementById("btnSyncScrollToggle");
+    const icon = document.getElementById("syncScrollIcon");
+    const text = document.getElementById("syncScrollText");
+    if (!btn) return;
+
+    if (this.syncScrollEnabled) {
+      btn.classList.add("active");
+      if (icon) icon.className = "fa-solid fa-link";
+      if (text) text.textContent = "同步滚动: 开";
+      btn.title = "经文、对照经文与注释同步滚动 (已开启，点击可切换为独立滚动)";
+    } else {
+      btn.classList.remove("active");
+      if (icon) icon.className = "fa-solid fa-link-slash";
+      if (text) text.textContent = "同步滚动: 关";
+      btn.title = "经文、对照经文与注释独立滚动 (已关闭，点击可开启同步)";
+    }
+  }
+
+  getTopVisibleVerse(container) {
+    if (!container) return null;
+    const cRect = container.getBoundingClientRect();
+    const rows = container.querySelectorAll(".verse-row");
+    for (let r of rows) {
+      const rRect = r.getBoundingClientRect();
+      if (rRect.bottom > cRect.top + 15) {
+        return parseInt(r.dataset.verseNum);
+      }
+    }
+    return null;
+  }
+
+  getTopVisibleParallelVerse(container) {
+    if (!container) return null;
+    const cRect = container.getBoundingClientRect();
+    const rows = container.querySelectorAll(".parallel-table tr[data-verse-num]");
+    for (let r of rows) {
+      const rRect = r.getBoundingClientRect();
+      if (rRect.bottom > cRect.top + 15) {
+        return parseInt(r.dataset.verseNum);
+      }
+    }
+    return null;
+  }
+
+  getTopVisibleCommentaryVerse(container) {
+    if (!container) return null;
+    const cRect = container.getBoundingClientRect();
+    const chunks = container.querySelectorAll(".commentary-chunk");
+    for (let c of chunks) {
+      const rRect = c.getBoundingClientRect();
+      if (rRect.bottom > cRect.top + 15) {
+        const id = c.id; // e.g. comm-verse-3
+        const num = id.replace("comm-verse-", "");
+        return parseInt(num) || null;
+      }
+    }
+    return null;
+  }
+
+  scrollScriptureToVerse(v) {
+    const scriptureBody = document.getElementById("bibleView");
+    const target = document.getElementById(`verse-row-${v}`);
+    if (scriptureBody && target) {
+      const cRect = scriptureBody.getBoundingClientRect();
+      const rRect = target.getBoundingClientRect();
+      const offset = rRect.top - cRect.top + scriptureBody.scrollTop;
+      scriptureBody.scrollTo({ top: offset, behavior: "auto" });
+    }
+  }
+
+  scrollParallelToVerse(v) {
+    const parallelBody = document.getElementById("parallelView");
+    const target = document.getElementById(`parallel-row-${v}`);
+    if (parallelBody && target) {
+      const cRect = parallelBody.getBoundingClientRect();
+      const rRect = target.getBoundingClientRect();
+      const offset = rRect.top - cRect.top + parallelBody.scrollTop;
+      parallelBody.scrollTo({ top: offset, behavior: "auto" });
+    }
+  }
+
+  scrollCommentaryToVerse(v) {
+    const commBody = document.getElementById("commentaryContainer");
+    const target = document.getElementById(`comm-verse-${v}`);
+    if (commBody && target) {
+      const cRect = commBody.getBoundingClientRect();
+      const rRect = target.getBoundingClientRect();
+      const offset = rRect.top - cRect.top + commBody.scrollTop;
+      commBody.scrollTo({ top: offset, behavior: "auto" });
+      document.querySelectorAll(".commentary-chunk").forEach(c => c.classList.remove("active-commentary"));
+      target.classList.add("active-commentary");
+    }
+  }
+
+  updateActiveVerseBadgeOnly(v) {
+    this.currentVerse = v;
+    const vSel = document.getElementById("verseSelect");
+    if (vSel) vSel.value = v;
+    const ind = document.getElementById("activeVerseIndicator");
+    if (ind) ind.textContent = `第 ${v} 节`;
+  }
+
+  // =========================================================
+  // Requirement 1: 5 Draggable Panels & Layout Persistence
+  // =========================================================
+  setupPanelDragAndDrop() {
+    const container = document.getElementById("workbenchContainer");
+    const panels = container.querySelectorAll(".draggable-panel");
+
+    panels.forEach(panel => {
+      const handle = panel.querySelector(".drag-handle");
+      if (!handle) return;
+
+      handle.setAttribute("draggable", "true");
+
+      handle.addEventListener("dragstart", (e) => {
+        this.draggedPanel = panel;
+        panel.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", panel.id);
+      });
+
+      handle.addEventListener("dragend", () => {
+        panel.classList.remove("dragging");
+        this.draggedPanel = null;
+        document.querySelectorAll(".draggable-panel").forEach(p => p.classList.remove("drag-over"));
+        this.saveCustomPanelLayout();
+      });
+
+      panel.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        if (!this.draggedPanel || this.draggedPanel === panel) return;
+        e.dataTransfer.dropEffect = "move";
+        panel.classList.add("drag-over");
+      });
+
+      panel.addEventListener("dragleave", () => {
+        panel.classList.remove("drag-over");
+      });
+
+      panel.addEventListener("drop", (e) => {
+        e.preventDefault();
+        panel.classList.remove("drag-over");
+        if (!this.draggedPanel || this.draggedPanel === panel) return;
+
+        const rect = panel.getBoundingClientRect();
+        const dropAfter = (e.clientX - rect.left) > (rect.width / 2);
+
+        if (dropAfter) {
+          panel.after(this.draggedPanel);
+        } else {
+          panel.before(this.draggedPanel);
+        }
+
+        this.saveCustomPanelLayout();
+        showToast("窗口位置已更新并保存！", "📐");
+      });
+    });
+
+    // Panel close/collapse buttons
+    document.querySelectorAll(".panel-close-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const panelId = btn.dataset.closePanel;
+        const panel = document.getElementById(`panel-${panelId}`);
+        if (panel) {
+          panel.style.display = "none";
+          this.updatePanelTogglesUi();
+          this.saveCustomPanelLayout();
+        }
+      });
+    });
+
+    // Top Bar Panel Toggles
+    const toggleMap = {
+      toggleOutlineBtn: "panel-outline",
+      toggleScriptureBtn: "panel-scripture",
+      toggleParallelBtn: "panel-parallel",
+      toggleIntroBtn: "panel-intro",
+      toggleCommentaryBtn: "panel-commentary"
+    };
+
+    Object.entries(toggleMap).forEach(([btnId, pId]) => {
+      const btn = document.getElementById(btnId);
+      if (btn) {
+        btn.addEventListener("click", () => {
+          const p = document.getElementById(pId);
+          if (p) {
+            const isHidden = (p.style.display === "none");
+            p.style.display = isHidden ? "flex" : "none";
+            btn.classList.toggle("active", isHidden);
+            this.saveCustomPanelLayout();
+          }
+        });
+      }
+    });
+
+    // Reset Layout Button
+    const resetBtn = document.getElementById("btnResetLayout");
+    if (resetBtn) {
+      resetBtn.addEventListener("click", () => {
+        if (confirm("是否重置窗口布局为默认次序与大小？")) {
+          localStorage.removeItem("bible_workbench_panels_order");
+          localStorage.removeItem("bible_workbench_panels_state");
+          location.reload();
+        }
+      });
+    }
+  }
+
+  saveCustomPanelLayout() {
+    const container = document.getElementById("workbenchContainer");
+    const panels = container.querySelectorAll(".draggable-panel");
+    const order = [];
+    panels.forEach(p => {
+      const pid = p.dataset.panelId || p.id.replace("panel-", "");
+      order.push({
+        id: pid,
+        visible: p.style.display !== "none"
+      });
+    });
+
+    try {
+      localStorage.setItem("bible_workbench_panels_order", JSON.stringify(order));
+    } catch (e) {}
+  }
+
+  restoreCustomPanelLayout() {
+    try {
+      const saved = localStorage.getItem("bible_workbench_panels_order");
+      if (!saved) return;
+      const order = JSON.parse(saved);
+      if (!Array.isArray(order) || order.length === 0) return;
+
+      const container = document.getElementById("workbenchContainer");
+      order.forEach(item => {
+        const panel = document.getElementById(`panel-${item.id}`);
+        if (panel) {
+          container.appendChild(panel); // re-append in saved order
+          if (item.visible === false) {
+            panel.style.display = "none";
+          }
+        }
+      });
+
+      this.updatePanelTogglesUi();
+    } catch (e) {
+      console.warn("Restore layout note:", e);
+    }
+  }
+
+  updatePanelTogglesUi() {
+    const toggleMap = {
+      toggleOutlineBtn: "panel-outline",
+      toggleScriptureBtn: "panel-scripture",
+      toggleParallelBtn: "panel-parallel",
+      toggleIntroBtn: "panel-intro",
+      toggleCommentaryBtn: "panel-commentary"
+    };
+
+    Object.entries(toggleMap).forEach(([btnId, pId]) => {
+      const btn = document.getElementById(btnId);
+      const p = document.getElementById(pId);
+      if (btn && p) {
+        btn.classList.toggle("active", p.style.display !== "none");
+      }
+    });
   }
 
   // =========================================================
@@ -3051,19 +3375,16 @@ class BibleWorkbenchApp {
         throw new Error("未获取到有效经文数据");
       }
 
-      // Map verses
-      const targetMap = BUILTIN_DATA_VERSES["CUV"]; // default write target
+      const targetMap = BUILTIN_DATA_VERSES["CUV"];
       data.forEach(item => {
         const v = item.verse;
         let txt = item.text.replace(/<[^>]+>/g, "").trim();
-        // remove spaces for Chinese
         if (trans.startsWith("CU") || trans.startsWith("Chi")) {
           txt = txt.replace(/\s+/g, "");
         }
         targetMap[`${bookNo}-${chapNo}-${v}`] = txt;
       });
 
-      // Save to IndexedDB online cache
       await db.saveOnlineCache({
         id: `${trans}-${bookNo}-${chapNo}`,
         translation: trans,
@@ -3079,7 +3400,10 @@ class BibleWorkbenchApp {
       }
 
       showToast(`已成功在线加载并缓存 ${data.length} 节经文！`, "✅");
-      setTimeout(() => this.renderPassage(), 400);
+      setTimeout(() => {
+        this.renderPassage();
+        this.renderParallelPassage();
+      }, 400);
     } catch (err) {
       if (statusEl) {
         statusEl.className = "online-loader-status status-msg error";
@@ -3162,7 +3486,6 @@ class BibleWorkbenchApp {
       });
     }
     else if (this.activeLeftTab === "myHighlights") {
-      // My Highlights
       container.innerHTML = `<div class="outline-group-title"><i class="fa-solid fa-highlighter"></i> 我的高亮标注 (${this.highlights.size} 条)</div>`;
       if (this.highlights.size === 0) {
         container.innerHTML += `<div class="text-secondary" style="padding:10px;">暂无经文高亮。点击经文行即可使用 5 种彩色荧光笔标记经文。</div>`;
@@ -3188,7 +3511,6 @@ class BibleWorkbenchApp {
       });
     }
     else if (this.activeLeftTab === "myNotes") {
-      // My Notes
       container.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
           <div class="outline-group-title" style="margin:0;"><i class="fa-solid fa-pen-to-square"></i> 研经札记 (${this.notes.size} 篇)</div>
@@ -3212,7 +3534,7 @@ class BibleWorkbenchApp {
         card.innerHTML = `
           <div class="note-card-header">
             <span style="font-weight:700; font-size:12px; color:var(--primary);">${escapeHtml(n.refStr || key)}</span>
-            <span style="font-size:10px; color:var(--text-muted);">${(n.updatedAt || "").slice(0, 10)}</span>
+            <span style="font-size:10px; color:var(--text-muted);">${(n.updatedAt||"").slice(0, 10)}</span>
           </div>
           <div class="note-card-text">${escapeHtml(n.text || "")}</div>
         `;
@@ -3245,7 +3567,7 @@ class BibleWorkbenchApp {
     const badgeEl = document.getElementById("introAuthorBadge");
     const container = document.getElementById("introContainer");
 
-    badgeEl.textContent = introData.author ? introData.author.split("(")[0].trim() : "圣经学者";
+    badgeEl.textContent = introData.author ? introData.author.split("(")[0].trim() : "使徒约翰";
     container.innerHTML = `
       ${introData.content || ""}
       <div style="margin-top:10px; font-size:11.5px; color:var(--text-muted);">
@@ -3302,7 +3624,6 @@ class BibleWorkbenchApp {
     const book = BOOK_MAP.get(this.currentBook);
     let versesDict = {};
 
-    // Check builtin commentary
     if (BUILTIN_BOOK_COMMENTARIES[this.activeCommId]) {
       const commEntry = BUILTIN_BOOK_COMMENTARIES[this.activeCommId];
       if (commEntry.books && commEntry.books[bookKey]) {
@@ -3407,7 +3728,6 @@ class BibleWorkbenchApp {
       candidates.push(parsed);
     }
 
-    // Also match books by name
     const qLower = query.toLowerCase();
     BIBLE_BOOKS.forEach(b => {
       if (!query || b.name.includes(query) || b.abbr.includes(query) || b.english.toLowerCase().includes(qLower) || (b.enAbbr && b.enAbbr.includes(qLower))) {
@@ -3415,7 +3735,6 @@ class BibleWorkbenchApp {
       }
     });
 
-    // Deduplicate & limit to 8
     const seen = new Set();
     const finalCandidates = [];
     for (const c of candidates) {
@@ -3454,10 +3773,8 @@ class BibleWorkbenchApp {
   parseScriptureReference(input) {
     if (!input) return null;
     const clean = input.trim();
-    // Match: [Book] [Chapter]:[Verse] or [Book] [Chapter]
     const m = clean.match(/^([\u4e00-\u9fa5a-zA-Z0-9]+)\s*(\d+)(?:[:：](\d+))?$/);
     if (!m) {
-      // Just book abbreviation
       const bNo = BOOK_NAME_MAP.get(clean.toLowerCase());
       if (bNo) return { bookNo: bNo, chapter: 1, verse: 1 };
       return null;
@@ -3488,13 +3805,16 @@ class BibleWorkbenchApp {
     document.getElementById("verseSelect").value = this.currentVerse;
 
     this.renderPassage();
+    this.renderParallelPassage();
     this.renderLeftPanel();
     this.renderBookIntro();
     this.renderCommentary();
 
     setTimeout(() => {
-      const row = document.getElementById(`verse-row-${this.currentVerse}`) || document.getElementById(`parallel-row-${this.currentVerse}`);
+      const row = document.getElementById(`verse-row-${this.currentVerse}`);
       if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
+      const pRow = document.getElementById(`parallel-row-${this.currentVerse}`);
+      if (pRow) pRow.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 150);
   }
 
@@ -3504,7 +3824,6 @@ class BibleWorkbenchApp {
   setupFloatingVerseBar() {
     const bar = document.getElementById("verseFloatingBar");
 
-    // Color pickers
     bar.querySelectorAll(".btn-hl-color").forEach(btn => {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -3520,35 +3839,30 @@ class BibleWorkbenchApp {
       });
     });
 
-    // Note button
     document.getElementById("btnBarNote").addEventListener("click", (e) => {
       e.stopPropagation();
       bar.style.display = "none";
       if (this.selectedVerseForBar) this.openNoteEditor(this.selectedVerseForBar);
     });
 
-    // Copy button
     document.getElementById("btnBarCopy").addEventListener("click", (e) => {
       e.stopPropagation();
       bar.style.display = "none";
       if (this.selectedVerseForBar) this.copyVerseCitation(this.selectedVerseForBar);
     });
 
-    // Speak button
     document.getElementById("btnBarSpeak").addEventListener("click", (e) => {
       e.stopPropagation();
       bar.style.display = "none";
       if (this.selectedVerseForBar) this.playTtsVerse(this.selectedVerseForBar);
     });
 
-    // Share Card button
     document.getElementById("btnBarCard").addEventListener("click", (e) => {
       e.stopPropagation();
       bar.style.display = "none";
       if (this.selectedVerseForBar) this.openShareCardModal(this.selectedVerseForBar);
     });
 
-    // Click outside hides bar
     document.addEventListener("click", (e) => {
       if (!bar.contains(e.target) && !e.target.closest(".verse-row") && !e.target.closest(".parallel-table tr")) {
         bar.style.display = "none";
@@ -3564,7 +3878,7 @@ class BibleWorkbenchApp {
     const rect = targetEl.getBoundingClientRect();
     const barHeight = 36;
     let top = rect.top - barHeight - 6;
-    if (top < 50) top = rect.bottom + 6; // flip below if offscreen
+    if (top < 50) top = rect.bottom + 6;
 
     bar.style.top = `${top + window.scrollY}px`;
     bar.style.left = `${Math.max(10, rect.left + 20)}px`;
@@ -3590,6 +3904,7 @@ class BibleWorkbenchApp {
 
     showToast(`已标记【${this.getColorLabel(color)}】高亮！`, "🖍️");
     this.renderPassage();
+    this.renderParallelPassage();
     if (this.activeLeftTab === "myHighlights") this.renderLeftPanel();
   }
 
@@ -3599,6 +3914,7 @@ class BibleWorkbenchApp {
     await db.deleteHighlight(key);
     showToast("已清除经文高亮！", "⚪");
     this.renderPassage();
+    this.renderParallelPassage();
     if (this.activeLeftTab === "myHighlights") this.renderLeftPanel();
   }
 
@@ -3733,7 +4049,6 @@ class BibleWorkbenchApp {
       if (e.target === modal) closeModal();
     });
 
-    // Theme selector
     modal.querySelectorAll(".card-style-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         modal.querySelectorAll(".card-style-btn").forEach(b => b.classList.remove("active"));
@@ -3813,7 +4128,7 @@ class BibleWorkbenchApp {
       localStorage.setItem("bible_parallel_versions", JSON.stringify(selected));
       showToast("多译本并排配置已更新！", "⚙️");
       closeModal();
-      this.renderPassage();
+      this.renderParallelPassage();
     });
   }
 
@@ -3898,7 +4213,6 @@ class BibleWorkbenchApp {
       return;
     }
 
-    // Strip Strong tags [G...] or [H...]
     text = text.replace(/\[(G\d+|H\d+)\]/g, "");
 
     const isEnglish = (this.activeVersion === "ESV" || this.activeVersion === "NASB");
@@ -3909,7 +4223,6 @@ class BibleWorkbenchApp {
     this.ttsCurrentVerse = vNum;
     this.setActiveVerse(vNum);
 
-    // Glowing animation
     document.querySelectorAll(".verse-row").forEach(r => r.classList.remove("speaking-pulse"));
     const activeRow = document.getElementById(`verse-row-${vNum}`);
     if (activeRow) {
@@ -4134,12 +4447,12 @@ class BibleWorkbenchApp {
   // General Event Listeners & Keyboard Shortcuts
   // =========================================================
   setupEventListeners() {
-    // Navigation controls
     document.getElementById("chapterSelect").addEventListener("change", (e) => {
       this.currentChapter = parseInt(e.target.value);
       this.currentVerse = 1;
       this.updateVerseSelect();
       this.renderPassage();
+      this.renderParallelPassage();
       this.renderLeftPanel();
       this.renderCommentary();
     });
@@ -4147,14 +4460,13 @@ class BibleWorkbenchApp {
     document.getElementById("verseSelect").addEventListener("change", (e) => {
       const v = parseInt(e.target.value);
       this.setActiveVerse(v);
-      const row = document.getElementById(`verse-row-${v}`) || document.getElementById(`parallel-row-${v}`);
+      const row = document.getElementById(`verse-row-${v}`);
       if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
     });
 
     document.getElementById("btnPrevChapter").addEventListener("click", () => this.navigateChapter(-1));
     document.getElementById("btnNextChapter").addEventListener("click", () => this.navigateChapter(1));
 
-    // Copy Passage Button
     const cpBtn = document.getElementById("btnCopyPassage");
     if (cpBtn) {
       cpBtn.addEventListener("click", () => {
@@ -4181,20 +4493,7 @@ class BibleWorkbenchApp {
 
     // Panel Toggles
     const toggleOutlineBtn = document.getElementById("toggleOutlineBtn");
-    const toggleCommentaryBtn = document.getElementById("toggleCommentaryBtn");
     const toggleDrawerBtn = document.getElementById("toggleDrawerBtn");
-
-    toggleOutlineBtn.addEventListener("click", () => {
-      const left = document.getElementById("leftPanel");
-      left.style.display = (left.style.display === "none") ? "flex" : "none";
-      toggleOutlineBtn.classList.toggle("active", left.style.display !== "none");
-    });
-
-    toggleCommentaryBtn.addEventListener("click", () => {
-      const right = document.getElementById("rightPanel");
-      right.style.display = (right.style.display === "none") ? "flex" : "none";
-      toggleCommentaryBtn.classList.toggle("active", right.style.display !== "none");
-    });
 
     toggleDrawerBtn.addEventListener("click", () => {
       const drawer = document.getElementById("bottomDrawer");
@@ -4218,7 +4517,6 @@ class BibleWorkbenchApp {
       });
     });
 
-    // Search Trigger
     document.getElementById("btnRunSearch").addEventListener("click", () => {
       const term = document.getElementById("searchInput").value;
       const ver = document.getElementById("searchVersionSelect").value;
@@ -4233,7 +4531,6 @@ class BibleWorkbenchApp {
       }
     });
 
-    // Left Panel Tabs
     document.querySelectorAll("[data-left-tab]").forEach(btn => {
       btn.addEventListener("click", () => {
         document.querySelectorAll("[data-left-tab]").forEach(b => b.classList.remove("active"));
@@ -4243,7 +4540,6 @@ class BibleWorkbenchApp {
       });
     });
 
-    // Theme & Font Scale
     document.getElementById("themeSelect").addEventListener("change", (e) => {
       this.setTheme(e.target.value);
     });
@@ -4251,15 +4547,12 @@ class BibleWorkbenchApp {
     document.getElementById("btnFontDec").addEventListener("click", () => this.adjustFontSize(-1));
     document.getElementById("btnFontInc").addEventListener("click", () => this.adjustFontSize(1));
 
-    // Popover Close
     document.getElementById("btnCloseStrongPopover").addEventListener("click", () => {
       document.getElementById("strongPopover").style.display = "none";
     });
 
-    // Setup Manage Modal
     this.setupManageModal();
 
-    // Global Keyboard navigation
     window.addEventListener("keydown", (e) => {
       const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : "";
       if (activeTag === "input" || activeTag === "textarea") return;
@@ -4719,6 +5012,7 @@ class BibleWorkbenchApp {
     this.updateVerseSelect();
 
     this.renderPassage();
+    this.renderParallelPassage();
     this.renderLeftPanel();
     this.renderBookIntro();
     this.renderCommentary();
@@ -4731,14 +5025,42 @@ class BibleWorkbenchApp {
       btn.classList.toggle("active", parseInt(btn.dataset.mode) === mode);
     });
 
-    const left = document.getElementById("leftPanel");
-    const center = document.getElementById("centerPanel");
-    const right = document.getElementById("rightPanel");
-    left.style.display = "";
-    center.style.display = "";
-    right.style.display = "";
+    const pOutline = document.getElementById("panel-outline");
+    const pScripture = document.getElementById("panel-scripture");
+    const pParallel = document.getElementById("panel-parallel");
+    const pIntro = document.getElementById("panel-intro");
+    const pCommentary = document.getElementById("panel-commentary");
 
+    if (mode === 1) {
+      if (pOutline) pOutline.style.display = "flex";
+      if (pScripture) pScripture.style.display = "flex";
+      if (pParallel) pParallel.style.display = "none";
+      if (pIntro) pIntro.style.display = "none";
+      if (pCommentary) pCommentary.style.display = "flex";
+    } else if (mode === 2) {
+      if (pOutline) pOutline.style.display = "none";
+      if (pScripture) pScripture.style.display = "flex";
+      if (pParallel) pParallel.style.display = "flex";
+      if (pIntro) pIntro.style.display = "none";
+      if (pCommentary) pCommentary.style.display = "none";
+    } else if (mode === 3) {
+      if (pOutline) pOutline.style.display = "none";
+      if (pScripture) pScripture.style.display = "flex";
+      if (pParallel) pParallel.style.display = "none";
+      if (pIntro) pIntro.style.display = "none";
+      if (pCommentary) pCommentary.style.display = "flex";
+    } else if (mode === 4) {
+      if (pOutline) pOutline.style.display = "flex";
+      if (pScripture) pScripture.style.display = "flex";
+      if (pParallel) pParallel.style.display = "flex";
+      if (pIntro) pIntro.style.display = "flex";
+      if (pCommentary) pCommentary.style.display = "flex";
+    }
+
+    this.updatePanelTogglesUi();
+    this.saveCustomPanelLayout();
     this.renderPassage();
+    this.renderParallelPassage();
   }
 
   setTheme(theme) {
@@ -4773,6 +5095,11 @@ class BibleWorkbenchApp {
         if (Array.isArray(parsed) && parsed.length > 0) this.parallelVersions = parsed;
       }
     } catch (e) {}
+
+    const savedSync = localStorage.getItem("bible_workbench_sync_scroll");
+    if (savedSync !== null) {
+      this.syncScrollEnabled = (savedSync === "true");
+    }
   }
 }
 

@@ -1805,3 +1805,153 @@ body[data-layout="4"] .right-panel { display: none; }
 .parallel-opt-row:hover {
   background-color: var(--bg-hover);
 }
+
+/* =========================================================
+   5 Discrete Draggable Panels & Synchronized Scrolling
+   ========================================================= */
+
+.workbench-container {
+  display: flex;
+  width: 100%;
+  height: calc(100vh - 48px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  position: relative;
+  background-color: var(--bg-app);
+}
+
+.draggable-panel {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-panel);
+  border-right: 1px solid var(--border-color);
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  transition: width 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease, background-color 0.15s ease;
+}
+
+/* Default 5-Panel width distribution */
+#panel-outline { width: 18%; min-width: 220px; }
+#panel-scripture { width: 28%; min-width: 280px; }
+#panel-parallel { width: 26%; min-width: 260px; }
+#panel-intro { width: 14%; min-width: 200px; }
+#panel-commentary { width: 22%; min-width: 250px; }
+
+/* Layout Mode overrides */
+body[data-layout="1"] #panel-outline { display: flex; width: 22%; }
+body[data-layout="1"] #panel-scripture { display: flex; width: 46%; }
+body[data-layout="1"] #panel-parallel { display: none; }
+body[data-layout="1"] #panel-intro { display: none; }
+body[data-layout="1"] #panel-commentary { display: flex; width: 32%; }
+
+body[data-layout="2"] #panel-outline { display: none; }
+body[data-layout="2"] #panel-scripture { display: flex; width: 50%; }
+body[data-layout="2"] #panel-parallel { display: flex; width: 50%; }
+body[data-layout="2"] #panel-intro { display: none; }
+body[data-layout="2"] #panel-commentary { display: none; }
+
+body[data-layout="3"] #panel-outline { display: none; }
+body[data-layout="3"] #panel-scripture { display: flex; width: 45%; }
+body[data-layout="3"] #panel-parallel { display: none; }
+body[data-layout="3"] #panel-intro { display: none; }
+body[data-layout="3"] #panel-commentary { display: flex; width: 55%; }
+
+body[data-layout="4"] #panel-outline { display: flex; width: 18%; }
+body[data-layout="4"] #panel-scripture { display: flex; width: 28%; }
+body[data-layout="4"] #panel-parallel { display: flex; width: 26%; }
+body[data-layout="4"] #panel-intro { display: flex; width: 13%; }
+body[data-layout="4"] #panel-commentary { display: flex; width: 23%; }
+
+/* Drag and Drop visual feedback */
+.panel-header.drag-handle {
+  cursor: grab;
+  user-select: none;
+}
+
+.panel-header.drag-handle:active {
+  cursor: grabbing;
+}
+
+.panel-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.drag-grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: grab;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.drag-grip:hover {
+  background-color: var(--bg-hover);
+  color: var(--primary);
+}
+
+.panel-title-text {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+  white-space: nowrap;
+}
+
+.panel-close-btn {
+  margin-left: 6px;
+  opacity: 0.6;
+}
+
+.panel-close-btn:hover {
+  opacity: 1;
+  color: #ef4444;
+}
+
+.draggable-panel.dragging {
+  opacity: 0.45;
+  transform: scale(0.99);
+}
+
+.draggable-panel.drag-over {
+  border-left: 3px solid var(--primary) !important;
+  background-color: var(--primary-light) !important;
+}
+
+/* Sync Scroll Button Toggle */
+#btnSyncScrollToggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  transition: all 0.15s ease;
+}
+
+#btnSyncScrollToggle.active {
+  background-color: var(--primary);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+#btnSyncScrollToggle:not(.active) {
+  background-color: transparent;
+  color: var(--text-muted);
+}
+
+/* Parallel View in Panel 3 */
+.parallel-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+}
+
+.parallel-header-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

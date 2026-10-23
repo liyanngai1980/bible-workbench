@@ -54,20 +54,29 @@
         </span>
       </div>
 
-      <!-- Layout toggles -->
+      <!-- Scroll Synchronization Toggle -->
+      <button class="btn btn-sm btn-toggle active" id="btnSyncScrollToggle" title="经文、对照经文与注释同步滚动 (已开启，点击可切换为独立滚动)">
+        <i class="fa-solid fa-link" id="syncScrollIcon"></i> <span id="syncScrollText">同步滚动: 开</span>
+      </button>
+
+      <!-- Panel Visibility Toggles -->
       <div class="layout-toggle-group">
         <button class="btn-toggle" id="toggleOutlineBtn" title="显示/隐藏大纲栏"><i class="fa-solid fa-list-tree"></i> 大纲</button>
-        <button class="btn-toggle" id="toggleCommentaryBtn" title="显示/隐藏导论与注释栏"><i class="fa-solid fa-book-open-reader"></i> 导论/注释</button>
-        <button class="btn-toggle" id="toggleDrawerBtn" title="显示/隐藏检索与原文字典"><i class="fa-solid fa-magnifying-glass"></i> 检索/词典</button>
+        <button class="btn-toggle active" id="toggleScriptureBtn" title="显示/隐藏主读经文栏"><i class="fa-solid fa-book-bible"></i> 经文</button>
+        <button class="btn-toggle active" id="toggleParallelBtn" title="显示/隐藏对照经文栏"><i class="fa-solid fa-table-columns"></i> 对照</button>
+        <button class="btn-toggle" id="toggleIntroBtn" title="显示/隐藏书卷导论栏"><i class="fa-solid fa-compass"></i> 导论</button>
+        <button class="btn-toggle active" id="toggleCommentaryBtn" title="显示/隐藏逐节注释栏"><i class="fa-solid fa-book-open-reader"></i> 注释</button>
+        <button class="btn-toggle" id="toggleDrawerBtn" title="显示/隐藏底栏词典检索"><i class="fa-solid fa-magnifying-glass"></i> 词典</button>
       </div>
 
-      <!-- Presets -->
+      <!-- Presets & Reset Layout -->
       <div class="workspace-modes" title="工作区预设模式">
-        <span class="mode-label">预设:</span>
-        <button class="btn-mode active" data-mode="1" title="模式 1: 经典三栏 (大纲 20% | 经文 50% | 注释 30%)">1</button>
-        <button class="btn-mode" data-mode="2" title="模式 2: 研读双栏 (经文 45% | 注释 55%)">2</button>
-        <button class="btn-mode" data-mode="3" title="模式 3: 专注注释 (注释导论全宽)">3</button>
-        <button class="btn-mode" data-mode="4" title="模式 4: 多译本并排比对 (Parallel Bible)">4</button>
+        <span class="mode-label">布局:</span>
+        <button class="btn-mode active" data-mode="1" title="模式 1: 经典三栏 (大纲 | 经文 | 注释)">1</button>
+        <button class="btn-mode" data-mode="2" title="模式 2: 研读对读 (经文 | 对照经文)">2</button>
+        <button class="btn-mode" data-mode="3" title="模式 3: 专注解经 (经文 | 逐节注释)">3</button>
+        <button class="btn-mode" data-mode="4" title="模式 4: 全功能五栏 (大纲 | 经文 | 对照 | 导论 | 注释 全景展开)">4</button>
+        <button class="btn-icon btn-sm" id="btnResetLayout" title="重设默认面板布局与拖曳次序"><i class="fa-solid fa-rotate-left"></i></button>
       </div>
     </div>
 
@@ -98,33 +107,41 @@
   <!-- Main Multi-Panel Workspace -->
   <main class="workbench-container" id="workbenchContainer">
 
-    <!-- Left Panel: Outlines, Cross References, Background Charts, Highlights, Personal Notes -->
-    <aside class="panel left-panel" id="leftPanel">
-      <div class="panel-header">
+    <!-- 窗口 1: 大纲与札记 (Outline Panel) -->
+    <aside class="panel draggable-panel" id="panel-outline" data-panel-id="outline">
+      <div class="panel-header drag-handle" title="按住拖曳可自由调整此窗口位置">
+        <div class="panel-title-wrap">
+          <span class="drag-grip" title="按住拖曳窗口"><i class="fa-solid fa-grip-vertical"></i></span>
+          <span class="panel-title-text"><i class="fa-solid fa-list-tree"></i> 大纲与札记</span>
+        </div>
         <div class="panel-tabs">
           <button class="tab-btn active" data-left-tab="studyOutline">研读大纲</button>
           <button class="tab-btn" data-left-tab="structOutline">结构大纲</button>
           <button class="tab-btn" data-left-tab="crossRef">串珠经文</button>
-          <button class="tab-btn" data-left-tab="backgroundCharts">图表与背景</button>
-          <button class="tab-btn" data-left-tab="myHighlights"><i class="fa-solid fa-highlighter"></i> 高亮标注</button>
-          <button class="tab-btn" data-left-tab="myNotes"><i class="fa-solid fa-pen-to-square"></i> 研经札记</button>
+          <button class="tab-btn" data-left-tab="backgroundCharts">图表背景</button>
+          <button class="tab-btn" data-left-tab="myHighlights"><i class="fa-solid fa-highlighter"></i> 高亮</button>
+          <button class="tab-btn" data-left-tab="myNotes"><i class="fa-solid fa-pen-to-square"></i> 札记</button>
         </div>
+        <button class="btn-icon btn-sm panel-close-btn" data-close-panel="outline" title="收起此窗口"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="panel-body outline-content" id="leftPanelBody">
         <!-- Rendered dynamically -->
       </div>
     </aside>
 
-    <!-- Center Panel: Bible Texts & Multi-Version Parallel Views -->
-    <section class="panel center-panel" id="centerPanel">
-      <div class="panel-header center-panel-header">
+    <!-- 窗口 2: 主读经文 (Primary Scripture Panel) -->
+    <section class="panel draggable-panel" id="panel-scripture" data-panel-id="scripture">
+      <div class="panel-header center-panel-header drag-handle" title="按住拖曳可自由调整此窗口位置">
+        <div class="panel-title-wrap">
+          <span class="drag-grip" title="按住拖曳窗口"><i class="fa-solid fa-grip-vertical"></i></span>
+          <span class="panel-title-text"><i class="fa-solid fa-book-bible"></i> 主读经文</span>
+        </div>
         <div class="version-tabs-scroll" id="versionTabsContainer">
-          <!-- Dynamic version tabs (CUV, CNV, NET, CSB, NASB, ESV, OUS, Parallel + User Imported) -->
+          <!-- Dynamic version tabs (CUV, CNV, NET, CSB, NASB, ESV, OUS + User Imported) -->
         </div>
         <div class="header-tools">
-          <button id="btnParallelConfig" class="btn btn-sm btn-ghost" title="配置并排比对的译本" style="display:none;">
-            <i class="fa-solid fa-sliders"></i> 并排配置
-          </button>
+          <button class="btn btn-xs btn-ghost" id="btnCopyPassage" title="复制本章全部经文"><i class="fa-solid fa-copy"></i> 复制本章</button>
+          <button class="btn-icon btn-sm panel-close-btn" data-close-panel="scripture" title="收起此窗口"><i class="fa-solid fa-xmark"></i></button>
         </div>
       </div>
 
@@ -136,9 +153,6 @@
               <h2 id="currentPassageTitle">约翰三书 第 1 章</h2>
               <span class="passage-meta" id="currentPassageMeta">现代标点和合本 (CUV)</span>
             </div>
-            <div class="passage-quick-actions">
-              <button class="btn btn-sm btn-ghost" id="btnCopyPassage" title="复制本章全部经文"><i class="fa-solid fa-copy"></i> 复制本章</button>
-            </div>
           </div>
         </div>
 
@@ -148,7 +162,7 @@
       </div>
 
       <!-- Bottom Drawer: Search Engine & Strong's Lexicon Panel -->
-      <div class="bottom-drawer" id="bottomDrawer">
+      <div class="bottom-drawer collapsed" id="bottomDrawer">
         <div class="drawer-header">
           <div class="drawer-tabs">
             <button class="drawer-tab-btn active" data-drawer-tab="search"><i class="fa-solid fa-magnifying-glass"></i> 全文检索</button>
@@ -159,7 +173,6 @@
           </div>
         </div>
         <div class="drawer-body">
-          <!-- Search View -->
           <div class="drawer-view active" id="drawerViewSearch">
             <div class="search-bar">
               <input type="text" id="searchInput" class="search-input" placeholder="输入经文关键字（如：真理、该犹、爱、善、道）或 Strong 编号（如 G225、H7225）回车检索...">
@@ -170,7 +183,6 @@
             <div class="search-results-list" id="searchResultsList"></div>
           </div>
 
-          <!-- Strong's Lexicon View -->
           <div class="drawer-view" id="drawerViewLexicon">
             <div class="lexicon-content" id="lexiconContent">
               <div class="lexicon-placeholder">
@@ -182,35 +194,59 @@
       </div>
     </section>
 
-    <!-- Right Panel: Book Introductions & Verse-by-Verse Commentaries -->
-    <aside class="panel right-panel" id="rightPanel">
-      <!-- Top Half: Book Introduction -->
-      <div class="right-panel-section intro-section">
-        <div class="panel-header">
-          <span class="section-title"><i class="fa-solid fa-compass"></i> 书卷导论与历史背景</span>
-          <div class="intro-source-badge" id="introAuthorBadge">唐纳德·伯迪克</div>
+    <!-- 窗口 3: 对照经文 (Parallel Bible Panel) -->
+    <section class="panel draggable-panel" id="panel-parallel" data-panel-id="parallel">
+      <div class="panel-header drag-handle" title="按住拖曳可自由调整此窗口位置">
+        <div class="panel-title-wrap">
+          <span class="drag-grip" title="按住拖曳窗口"><i class="fa-solid fa-grip-vertical"></i></span>
+          <span class="panel-title-text"><i class="fa-solid fa-table-columns"></i> 对照经文</span>
         </div>
-        <div class="panel-body intro-body" id="introContainer">
-          <!-- Book Introduction rendered here -->
+        <div class="parallel-header-tools">
+          <button id="btnParallelConfig" class="btn btn-sm btn-ghost" title="配置并排比对的译本">
+            <i class="fa-solid fa-sliders"></i> 并排配置
+          </button>
+          <button class="btn-icon btn-sm panel-close-btn" data-close-panel="parallel" title="收起此窗口"><i class="fa-solid fa-xmark"></i></button>
         </div>
       </div>
+      <div class="panel-body parallel-body" id="parallelView">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
 
-      <!-- Bottom Half: Verse-by-Verse Commentary -->
-      <div class="right-panel-section commentary-section">
-        <div class="panel-header">
-          <div class="panel-tabs" id="commentaryTabsContainer">
-            <button class="tab-btn active" data-comm-id="burdick">伯迪克注释</button>
-            <button class="tab-btn" data-comm-id="believers">信徒圣经注释</button>
-            <button class="tab-btn" data-comm-id="macarthur">讲道与解经</button>
-            <!-- User imported commentaries dynamically added here -->
-          </div>
-          <div class="active-verse-indicator" id="activeVerseIndicator" title="当前聚焦节">
-            第 1 节
-          </div>
+    <!-- 窗口 4: 书卷导论与历史背景 (Intro & Background Panel) -->
+    <aside class="panel draggable-panel" id="panel-intro" data-panel-id="intro">
+      <div class="panel-header drag-handle" title="按住拖曳可自由调整此窗口位置">
+        <div class="panel-title-wrap">
+          <span class="drag-grip" title="按住拖曳窗口"><i class="fa-solid fa-grip-vertical"></i></span>
+          <span class="panel-title-text"><i class="fa-solid fa-compass"></i> 导论与背景</span>
         </div>
-        <div class="panel-body commentary-body" id="commentaryContainer">
-          <!-- Verse commentaries rendered here -->
+        <div class="intro-source-badge" id="introAuthorBadge">使徒约翰</div>
+        <button class="btn-icon btn-sm panel-close-btn" data-close-panel="intro" title="收起此窗口"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="panel-body intro-body" id="introContainer">
+        <!-- Book Introduction rendered here -->
+      </div>
+    </aside>
+
+    <!-- 窗口 5: 逐节经文注释 (Commentary Panel) -->
+    <aside class="panel draggable-panel" id="panel-commentary" data-panel-id="commentary">
+      <div class="panel-header drag-handle" title="按住拖曳可自由调整此窗口位置">
+        <div class="panel-title-wrap">
+          <span class="drag-grip" title="按住拖曳窗口"><i class="fa-solid fa-grip-vertical"></i></span>
+          <span class="panel-title-text"><i class="fa-solid fa-book-open-reader"></i> 经文注释</span>
         </div>
+        <div class="panel-tabs" id="commentaryTabsContainer">
+          <button class="tab-btn active" data-comm-id="burdick">伯迪克注释</button>
+          <button class="tab-btn" data-comm-id="believers">信徒圣经注释</button>
+          <button class="tab-btn" data-comm-id="macarthur">讲道与解经</button>
+        </div>
+        <div class="active-verse-indicator" id="activeVerseIndicator" title="当前聚焦节">
+          第 1 节
+        </div>
+        <button class="btn-icon btn-sm panel-close-btn" data-close-panel="commentary" title="收起此窗口"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="panel-body commentary-body" id="commentaryContainer">
+        <!-- Verse commentaries rendered here -->
       </div>
     </aside>
 
