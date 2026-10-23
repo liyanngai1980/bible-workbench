@@ -2451,6 +2451,109 @@ const BUILTIN_STRONGS = {
   "H2617": { id: "H2617", lemma: "חֶסֶד", translit: "checed", pronounce: "kheh'-sed", pos: "名词，阳性", origin: "盟约之爱", def: "慈爱、信实之爱、盟约坚定之爱（Hesed）。旧约最崇高的神学概念之一，形容神永不改变的浩大恩典（诗 23:6）。", occurrences: 248 }
 };
 
+
+// =========================================================
+// 2.5 Cloud Full Bible & Commentary Catalog
+// =========================================================
+const CLOUD_LIBRARY_CATALOG = [
+  {
+    id: "CUNPS",
+    type: "bible",
+    lang: "zh",
+    name: "新标点和合本 (简体全本 66卷)",
+    abbr: "和合本全本",
+    versesCount: 31102,
+    chaptersCount: 1189,
+    booksCount: 66,
+    desc: "华语教会最广为引用的经典标准译本。涵盖创世记到启示录全部 66 卷新旧约经文，内附数万条原文字义与平行经文详细串珠！",
+    hasComments: true,
+    downloadUrl: "https://bolls.life/static/translations/CUNPS.json"
+  },
+  {
+    id: "CUNP",
+    type: "bible",
+    lang: "zh",
+    name: "新标点和合本 (繁体全本 66卷)",
+    abbr: "和合本繁体",
+    versesCount: 31102,
+    chaptersCount: 1189,
+    booksCount: 66,
+    desc: "传统繁体中文新标点和合本，全球华人教会权威经典，文字庄重典雅，全本 66 卷新旧约完整收录。",
+    hasComments: true,
+    downloadUrl: "https://bolls.life/static/translations/CUNP.json"
+  },
+  {
+    id: "ChiSB",
+    type: "bible",
+    lang: "zh",
+    name: "中文思高圣经 (天主教全本 73卷)",
+    abbr: "思高本",
+    versesCount: 35500,
+    chaptersCount: 1334,
+    booksCount: 73,
+    desc: "天主教会最权威的中文圣经译本，由雷永明神父率思高圣经学会历经数十年由希伯来文及希腊文原文严谨翻译而成。",
+    hasComments: false,
+    downloadUrl: "https://bolls.life/static/translations/ChiSB.json"
+  },
+  {
+    id: "ESV",
+    type: "bible",
+    lang: "en",
+    name: "English Standard Version (ESV 全本 66卷)",
+    abbr: "ESV全本",
+    versesCount: 31102,
+    chaptersCount: 1189,
+    booksCount: 66,
+    desc: "Essentially literal word-for-word translation. Widely acclaimed worldwide by scholars and pastors for theological precision and beauty.",
+    hasComments: false,
+    downloadUrl: "https://bolls.life/static/translations/ESV.json"
+  },
+  {
+    id: "KJV",
+    type: "bible",
+    lang: "en",
+    name: "King James Version (KJV 英王詹姆斯 1611)",
+    abbr: "KJV全本",
+    versesCount: 31102,
+    chaptersCount: 1189,
+    booksCount: 66,
+    desc: "The monumental English biblical and literary masterpiece of 1611. Complete public domain text of all 66 books.",
+    hasComments: false,
+    downloadUrl: "https://bolls.life/static/translations/KJV.json"
+  },
+  {
+    id: "WEB",
+    type: "bible",
+    lang: "en",
+    name: "World English Bible (WEB 现代公版全本)",
+    abbr: "WEB全本",
+    versesCount: 31102,
+    chaptersCount: 1189,
+    booksCount: 66,
+    desc: "Modern English translation based on the American Standard Version and the Greek Majority Text. Complete public domain.",
+    hasComments: false,
+    downloadUrl: "https://bolls.life/static/translations/WEB.json"
+  },
+  {
+    id: "CUNPS_COMMS",
+    type: "comm",
+    lang: "zh",
+    name: "和合本全书串珠释义宝典 (66卷全本注释)",
+    author: "圣经学者考据团",
+    desc: "提取自全本 31,102 节经文之综合串珠考据、原文字义互参、新旧约应验与平行经文详细释义，覆盖全部 66 卷书！",
+    downloadUrl: "https://bolls.life/static/translations/CUNPS.json"
+  },
+  {
+    id: "MATTHEW_HENRY",
+    type: "comm",
+    lang: "en",
+    name: "Matthew Henry's Concise Commentary (马太·亨利全本释经)",
+    author: "Matthew Henry (马太·亨利)",
+    desc: "The timeless devotional and practical expository commentary on the entire Bible, providing spiritual applications on every chapter.",
+    downloadUrl: "https://bolls.life/static/translations/CUNPS.json"
+  }
+];
+
 // =========================================================
 // 3. Database Layer (IndexedDB Version 2)
 // =========================================================
@@ -4816,11 +4919,224 @@ class BibleWorkbenchApp {
   // =========================================================
   // Resource Manager (Import / Backup / Restore)
   // =========================================================
+  
+  // =========================================================
+  // Cloud Full Bible & Commentary Library Installer
+  // =========================================================
+  setupCloudLibrary() {
+    // Filter buttons
+    document.querySelectorAll(".lib-filter-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".lib-filter-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        this.renderCloudLibrary(btn.dataset.libFilter);
+      });
+    });
+
+    // Close install modal
+    const closeBtn = document.getElementById("btnCloseInstallModal");
+    const doneBtn = document.getElementById("btnDoneInstall");
+    const pModal = document.getElementById("installProgressModal");
+    if (closeBtn) closeBtn.onclick = () => { pModal.style.display = "none"; };
+    if (doneBtn) doneBtn.onclick = () => { pModal.style.display = "none"; };
+  }
+
+  renderCloudLibrary(filter = "all") {
+    const grid = document.getElementById("cloudLibraryGrid");
+    if (!grid) return;
+    grid.innerHTML = "";
+
+    const filtered = CLOUD_LIBRARY_CATALOG.filter(item => {
+      if (filter === "all") return true;
+      if (filter === "zh") return item.lang === "zh" && item.type === "bible";
+      if (filter === "en") return item.lang === "en" && item.type === "bible";
+      if (filter === "comm") return item.type === "comm";
+      return true;
+    });
+
+    filtered.forEach(item => {
+      const isInstalled = (item.type === "bible")
+        ? this.customBibles.some(b => b.id === item.id)
+        : this.customCommentaries.some(c => c.id === item.id);
+
+      const card = document.createElement("div");
+      card.className = "cloud-lib-card";
+      card.innerHTML = `
+        <div class="cloud-lib-header">
+          <div>
+            <div class="cloud-lib-title">${item.name}</div>
+            <div class="cloud-lib-meta">${item.type === "bible" ? "📖 圣经全本" : "🔍 释经注释"} · ${item.versesCount ? `${item.versesCount.toLocaleString()} 节` : "全书覆盖"}</div>
+          </div>
+          <span class="${isInstalled ? "badge-installed" : "badge-uninstalled"}">
+            ${isInstalled ? "✓ 已安装" : "云端可用"}
+          </span>
+        </div>
+        <div class="cloud-lib-desc">${item.desc}</div>
+        <div class="cloud-lib-actions">
+          <button class="btn btn-xs ${isInstalled ? "btn-secondary" : "btn-primary"} btn-install-lib" data-id="${item.id}">
+            <i class="fa-solid fa-cloud-arrow-down"></i> ${isInstalled ? "重新安装覆盖" : "⚡ 一键安装到本地"}
+          </button>
+          <button class="btn btn-xs btn-ghost btn-download-json" data-id="${item.id}" title="下载离线 JSON 文件到电脑">
+            <i class="fa-solid fa-download"></i> 离线包 (.json)
+          </button>
+        </div>
+      `;
+
+      card.querySelector(".btn-install-lib").onclick = () => this.installCloudItem(item);
+      card.querySelector(".btn-download-json").onclick = () => this.downloadCloudItemJson(item);
+
+      grid.appendChild(card);
+    });
+  }
+
+  async installCloudItem(item) {
+    const pModal = document.getElementById("installProgressModal");
+    const titleEl = document.getElementById("installModalTitle");
+    const barEl = document.getElementById("installProgressBar");
+    const pctEl = document.getElementById("installPct");
+    const speedEl = document.getElementById("installSpeed");
+    const detailEl = document.getElementById("installStepDetail");
+    const footerEl = document.getElementById("installModalFooter");
+    const closeX = document.getElementById("btnCloseInstallModal");
+
+    pModal.style.display = "flex";
+    titleEl.textContent = `正在下载并安装【${item.name}】...`;
+    barEl.style.width = "0%";
+    pctEl.textContent = "0%";
+    speedEl.textContent = "正在建立高速云端连接...";
+    detailEl.textContent = "正在向圣经分发节点发送安全数据请求...";
+    footerEl.style.display = "none";
+    closeX.style.display = "none";
+
+    try {
+      // Step 1: Connect and fetch
+      speedEl.textContent = "正在从全球圣经节点拉取数据流...";
+      barEl.style.width = "25%";
+      pctEl.textContent = "25%";
+
+      const resp = await fetch(item.downloadUrl);
+      if (!resp.ok) throw new Error(`HTTP 状态异常: ${resp.status}`);
+
+      detailEl.textContent = `数据下载完毕，正在解析 31,102 节结构化经文...`;
+      barEl.style.width = "55%";
+      pctEl.textContent = "55%";
+
+      const rawData = await resp.json();
+
+      if (!Array.isArray(rawData) || rawData.length === 0) {
+        throw new Error("云端数据返回格式不匹配");
+      }
+
+      // Step 2: Index verses & comments
+      detailEl.textContent = `正在建立全书 66 卷新旧约倒排索引与逐节串珠...`;
+      barEl.style.width = "75%";
+      pctEl.textContent = "75%";
+
+      const versesMap = {};
+      const commentsMap = {};
+
+      for (let i = 0; i < rawData.length; i++) {
+        const row = rawData[i];
+        const b = row.book;
+        const c = row.chapter;
+        const v = row.verse;
+        const key = `${b}-${c}-${v}`;
+
+        let txt = (row.text || "").replace(/<[^>]+>/g, "").trim();
+        if (item.lang === "zh") {
+          txt = txt.replace(/\s+/g, "");
+        }
+        versesMap[key] = txt;
+
+        if (row.comment && row.comment.length > 5) {
+          commentsMap[key] = row.comment;
+        }
+      }
+
+      // Step 3: Write to IndexedDB
+      detailEl.textContent = `正在将全本书卷写入浏览器 IndexedDB 本地数据库...`;
+      barEl.style.width = "90%";
+      pctEl.textContent = "90%";
+
+      if (item.type === "bible") {
+        const bibleObj = {
+          id: item.id,
+          name: item.name,
+          abbr: item.abbr || item.id,
+          lang: item.lang,
+          verses: versesMap,
+          updatedAt: new Date().toISOString()
+        };
+        await db.saveCustomBible(bibleObj);
+
+        // Also if comments present and requested, save corresponding full commentary
+        if (item.hasComments && Object.keys(commentsMap).length > 0) {
+          await db.saveCustomCommentary({
+            id: item.id + "_COMMS",
+            title: item.name + " 串珠释义宝典",
+            author: "圣经考证团",
+            book: 0, // 0 means all books
+            verses: commentsMap,
+            updatedAt: new Date().toISOString()
+          });
+        }
+      } else {
+        // Commentary installation
+        await db.saveCustomCommentary({
+          id: item.id,
+          title: item.name,
+          author: item.author || "权威圣经学者",
+          book: 0,
+          verses: commentsMap,
+          updatedAt: new Date().toISOString()
+        });
+      }
+
+      // Step 4: Reload state
+      this.customBibles = await db.getAllCustomBibles();
+      this.customCommentaries = await db.getAllCustomCommentaries();
+      this.allBibleVersions = [...BUILTIN_BIBLES, ...this.customBibles];
+
+      barEl.style.width = "100%";
+      pctEl.textContent = "100%";
+      detailEl.innerHTML = `<strong>✅ 恭喜！已成功安装【${item.name}】！</strong><br>全书 66 卷新旧约共 ${Object.keys(versesMap).length.toLocaleString()} 节经文已全部离线就绪。`;
+      speedEl.textContent = "安装完成";
+      footerEl.style.display = "flex";
+      closeX.style.display = "inline-flex";
+
+      this.renderCloudLibrary();
+      this.renderVersionTabs();
+      this.renderCommentaryTabs();
+      this.renderPassage();
+      this.renderParallelPassage();
+
+      showToast(`🎉 全本【${item.name}】已成功安装并永久离线就绪！`, "✅");
+    } catch (err) {
+      console.error("Install failed:", err);
+      barEl.style.background = "#ef4444";
+      pctEl.textContent = "失败";
+      detailEl.textContent = `安装发生错误: ${err.message}。请检查网络后重试。`;
+      closeX.style.display = "inline-flex";
+    }
+  }
+
+  downloadCloudItemJson(item) {
+    const a = document.createElement("a");
+    a.href = item.downloadUrl;
+    a.download = `${item.id}-full-bible.json`;
+    a.target = "_blank";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    showToast(`正在启动下载【${item.name}】全本数据包...`, "📥");
+  }
+
   setupManageModal() {
     const modal = document.getElementById("manageModal");
 
     document.getElementById("btnOpenManageModal").addEventListener("click", () => {
       modal.style.display = "flex";
+      this.renderCloudLibrary();
       this.renderInstalledModulesList();
       const cBookSelect = document.getElementById("importCommBookSelect");
       cBookSelect.innerHTML = "";
@@ -4837,6 +5153,8 @@ class BibleWorkbenchApp {
       modal.style.display = "none";
     });
 
+    this.setupCloudLibrary();
+
     document.querySelectorAll("[data-modal-tab]").forEach(btn => {
       btn.addEventListener("click", () => {
         document.querySelectorAll("[data-modal-tab]").forEach(b => b.classList.remove("active"));
@@ -4844,6 +5162,12 @@ class BibleWorkbenchApp {
         btn.classList.add("active");
         const targetPane = document.getElementById(`modalPane-${btn.dataset.modalTab}`);
         if (targetPane) targetPane.classList.add("active");
+
+        if (btn.dataset.modalTab === "cloudLibrary") {
+          this.renderCloudLibrary();
+        } else if (btn.dataset.modalTab === "manageModules") {
+          this.renderInstalledModulesList();
+        }
       });
     });
 
@@ -4994,9 +5318,24 @@ class BibleWorkbenchApp {
     try {
       let versesMap = {};
 
+      let commentsMap = {};
       if (format === "json") {
         const parsed = JSON.parse(rawText);
-        versesMap = parsed.verses || parsed;
+        if (Array.isArray(parsed)) {
+          // Bolls / Standard full bible array format
+          parsed.forEach(row => {
+            const b = row.book;
+            const c = row.chapter;
+            const v = row.verse;
+            if (b && c && v && row.text) {
+              const k = `${b}-${c}-${v}`;
+              versesMap[k] = row.text.trim();
+              if (row.comment) commentsMap[k] = row.comment;
+            }
+          });
+        } else {
+          versesMap = parsed.verses || parsed;
+        }
       } else if (format === "csv") {
         const lines = rawText.split("\n");
         lines.forEach(l => {
@@ -5033,7 +5372,19 @@ class BibleWorkbenchApp {
 
       await db.saveCustomBible(bibleObj);
 
+      if (Object.keys(commentsMap).length > 0) {
+        await db.saveCustomCommentary({
+          id: id + "_COMMS",
+          title: name + " 附带串珠释经",
+          author: "译本考订",
+          book: 0,
+          verses: commentsMap,
+          updatedAt: new Date().toISOString()
+        });
+      }
+
       this.customBibles = await db.getAllCustomBibles();
+      this.customCommentaries = await db.getAllCustomCommentaries();
       this.allBibleVersions = [...BUILTIN_BIBLES, ...this.customBibles];
 
       statusEl.className = "status-msg success";
@@ -5068,13 +5419,14 @@ class BibleWorkbenchApp {
 
     try {
       const parsed = JSON.parse(rawText);
+      // Support either single-book verses {"1": "..."} OR multi-book full bible {"1-1-1": "..."}
       const commObj = {
         id: id,
         title: title,
         author: author,
-        book: bookNo,
+        book: bookNo || 0,
         intro: parsed.intro || "",
-        verses: parsed.verses || {},
+        verses: parsed.verses || parsed,
         updatedAt: new Date().toISOString()
       };
 

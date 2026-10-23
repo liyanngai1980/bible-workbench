@@ -400,15 +400,43 @@
 
       <div class="modal-body">
         <div class="modal-nav">
-          <button class="modal-nav-btn active" data-modal-tab="importBible"><i class="fa-solid fa-file-import"></i> 导入圣经译本</button>
-          <button class="modal-nav-btn" data-modal-tab="importComm"><i class="fa-solid fa-book-bookmark"></i> 导入解经注释</button>
+          <button class="modal-nav-btn active" data-modal-tab="cloudLibrary"><i class="fa-solid fa-cloud-arrow-down"></i> 云端全本书库</button>
+          <button class="modal-nav-btn" data-modal-tab="importBible"><i class="fa-solid fa-file-import"></i> 导入本地圣经</button>
+          <button class="modal-nav-btn" data-modal-tab="importComm"><i class="fa-solid fa-book-bookmark"></i> 导入本地注释</button>
           <button class="modal-nav-btn" data-modal-tab="manageModules"><i class="fa-solid fa-cubes"></i> 已安装资源管理</button>
           <button class="modal-nav-btn" data-modal-tab="backup"><i class="fa-solid fa-hard-drive"></i> 数据备份与迁移</button>
         </div>
 
         <div class="modal-tab-content">
+                    <!-- Tab 0: Cloud Full Bible & Commentary Library -->
+          <div class="modal-tab-pane active" id="modalPane-cloudLibrary">
+            <div class="import-card">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+                <div>
+                  <h3><i class="fa-solid fa-cloud-arrow-down"></i> 云端全本圣经与释经书库 (一键离线安装)</h3>
+                  <p class="text-secondary" style="margin-bottom:0;">
+                    一键安装完整新旧约 66 卷全本圣经（包含全部 1189 章，31,102 节经文）及全书权威解经注释。安装后永久保存在浏览器本地 IndexedDB 数据库中，完全离线运行、免除网络依赖。
+                  </p>
+                </div>
+              </div>
+
+              <!-- Filter tabs -->
+              <div class="library-filter-bar">
+                <button class="btn btn-xs btn-ghost active lib-filter-btn" data-lib-filter="all">全部资源 (8)</button>
+                <button class="btn btn-xs btn-ghost lib-filter-btn" data-lib-filter="zh">中文译本 (3)</button>
+                <button class="btn btn-xs btn-ghost lib-filter-btn" data-lib-filter="en">英文译本 (3)</button>
+                <button class="btn btn-xs btn-ghost lib-filter-btn" data-lib-filter="comm">释经与串珠 (2)</button>
+              </div>
+
+              <!-- Catalog Grid -->
+              <div class="cloud-library-grid" id="cloudLibraryGrid">
+                <!-- Dynamically rendered or pre-populated cards -->
+              </div>
+            </div>
+          </div>
+
           <!-- Tab 1: Import Bible Version -->
-          <div class="modal-tab-pane active" id="modalPane-importBible">
+          <div class="modal-tab-pane" id="modalPane-importBible">
             <div class="import-card">
               <h3><i class="fa-solid fa-cloud-arrow-up"></i> 导入新圣经译本</h3>
               <p class="text-secondary">
@@ -543,6 +571,31 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Download & Install Progress Modal -->
+  <div class="modal-backdrop" id="installProgressModal" style="display:none;">
+    <div class="modal-dialog" style="max-width: 500px;">
+      <div class="modal-header">
+        <div class="modal-title"><i class="fa-solid fa-cloud-arrow-down"></i> <span id="installModalTitle">正在安装全本圣经...</span></div>
+        <button class="btn-icon" id="btnCloseInstallModal" style="display:none;"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body" style="padding: 24px; text-align: left;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px;">
+          <div style="font-size:36px; font-weight:800; color:var(--primary);" id="installPct">0%</div>
+          <div style="font-size:12px; color:var(--text-muted);" id="installSpeed">正在连接圣经云端节点...</div>
+        </div>
+        <div style="width:100%; height:10px; background:var(--bg-panel-alt); border-radius:5px; overflow:hidden; border:1px solid var(--border-color); margin-bottom:16px;">
+          <div id="installProgressBar" style="width:0%; height:100%; background:linear-gradient(90deg, #3b82f6, #10b981); transition:width 0.25s ease;"></div>
+        </div>
+        <div style="font-size:12.5px; color:var(--text-secondary); line-height:1.5;" id="installStepDetail">
+          正在准备下载数据流...
+        </div>
+      </div>
+      <div class="modal-footer-actions" id="installModalFooter" style="padding:12px 18px; border-top:1px solid var(--border-color); display:none; justify-content:flex-end;">
+        <button class="btn btn-primary" id="btnDoneInstall">完成并开始研读</button>
       </div>
     </div>
   </div>
