@@ -2738,6 +2738,17 @@ class BibleStorage {
       req.onerror = (e) => reject(e);
     });
   }
+
+  async getAllOnlineCache() {
+    await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction("online_cache", "readonly");
+      const store = tx.objectStore("online_cache");
+      const req = store.getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = (e) => reject(e);
+    });
+  }
 }
 
 const db = new BibleStorage();
@@ -2765,6 +2776,7 @@ class BibleWorkbenchApp {
 
     this.highlights = new Map(); // key -> { color, text, refStr, updatedAt }
     this.notes = new Map();      // key -> { book, chapter, verse, refStr, text, updatedAt }
+    this.onlineCacheMemory = new Map(); // id -> cacheObj with versesMap
 
     // Floating bar state
     this.selectedVerseForBar = null;
@@ -2793,6 +2805,45 @@ class BibleWorkbenchApp {
       hlList.forEach(h => this.highlights.set(h.key, h));
       const nList = await db.getAllNotes();
       nList.forEach(n => this.notes.set(n.key, n));
+
+      // Merge custom bibles into BUILTIN_DATA_VERSES
+      this.customBibles.forEach(cb => {
+        const targetId = (cb.id === "CUNPS" || cb.id === "CUNP") ? "CUV" : cb.id;
+        if (!BUILTIN_DATA_VERSES[targetId]) BUILTIN_DATA_VERSES[targetId] = {};
+        Object.assign(BUILTIN_DATA_VERSES[targetId], cb.verses || {});
+        if (!BUILTIN_DATA_VERSES[cb.id]) BUILTIN_DATA_VERSES[cb.id] = {};
+        Object.assign(BUILTIN_DATA_VERSES[cb.id], cb.verses || {});
+      });
+
+      // Load all cached online chapters from IndexedDB
+      this.onlineCacheMemory = new Map();
+      const cachedChapters = await db.getAllOnlineCache();
+      cachedChapters.forEach(entry => {
+        let vMap = {};
+        const trans = entry.translation || "CUV";
+        const targetId = (trans === "CUNPS" || trans === "CUNP") ? "CUV" : trans;
+        if (!BUILTIN_DATA_VERSES[targetId]) BUILTIN_DATA_VERSES[targetId] = {};
+        if (!BUILTIN_DATA_VERSES[trans]) BUILTIN_DATA_VERSES[trans] = {};
+
+        if (Array.isArray(entry.verses)) {
+          entry.verses.forEach(item => {
+            let txt = (item.text || "").replace(/<[^>]+>/g, "").trim();
+            if (trans.startsWith("CU") || trans.startsWith("Chi")) {
+              txt = txt.replace(/\s+/g, "");
+            }
+            const k = `${entry.book}-${entry.chapter}-${item.verse}`;
+            vMap[k] = txt;
+            BUILTIN_DATA_VERSES[targetId][k] = txt;
+            BUILTIN_DATA_VERSES[trans][k] = txt;
+          });
+        } else if (entry.verses && typeof entry.verses === "object") {
+          vMap = entry.verses;
+          Object.assign(BUILTIN_DATA_VERSES[targetId], vMap);
+          Object.assign(BUILTIN_DATA_VERSES[trans], vMap);
+        }
+        entry.versesMap = vMap;
+        this.onlineCacheMemory.set(entry.id, entry);
+      });
     } catch (e) {
       console.warn("IndexedDB load warning:", e);
     }
@@ -2965,19 +3016,48 @@ class BibleWorkbenchApp {
 
     container.innerHTML = "";
 
+    // Check if CUV or other translation is already cached for this chapter
+    const cuvMap = this.getVersesMap("CUV");
+    const hasCuvVerses = !!cuvMap[firstKey];
+
     if (!hasLocalVerses) {
+      const curTrans = this.activeVersion;
+      const isEnglishActive = (curTrans === "ESV" || curTrans === "NASB" || curTrans === "KJV");
+
       const card = document.createElement("div");
       card.className = "online-loader-card";
+
+      let promptMsg = `本地暂未缓存【${book ? book.name : ""} 第 ${this.currentChapter} 章】的【${verObj ? verObj.name : curTrans}】经文。`;
+      let cuvHint = "";
+      if (hasCuvVerses && curTrans !== "CUV") {
+        cuvHint = `
+          <div style="margin: 10px 0; padding: 10px 14px; background: rgba(52, 199, 89, 0.12); border: 1px solid rgba(52, 199, 89, 0.3); border-radius: 8px; font-size: 13px; color: var(--text-main);">
+            <i class="fa-solid fa-circle-check" style="color: #10b981;"></i> <strong>发现和合本已缓存本章！</strong>
+            <button class="btn btn-xs btn-primary" id="btnSwitchToCachedCuv" style="margin-left: 8px;">📖 立即切换为和合本阅读本章</button>
+          </div>
+        `;
+      }
+
       card.innerHTML = `
         <div class="online-loader-icon"><i class="fa-solid fa-cloud-arrow-down"></i></div>
         <h3>本地暂未缓存【${book ? book.name : ""} 第 ${this.currentChapter} 章】</h3>
-        <p>您可以一键在线下载本章经文（自动写入浏览器 IndexedDB 离线数据库，之后随时离线研读）：</p>
+        <p style="margin-bottom:8px;">${promptMsg}</p>
+        <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">点击下方按钮一键下载并缓存到浏览器本地 IndexedDB 离线数据库，之后随时离线研读：</p>
+        ${cuvHint}
         <div class="online-loader-actions">
-          <button class="btn btn-primary btn-online-fetch" data-trans="CUNPS"><i class="fa-solid fa-cloud-arrow-down"></i> 在线获取和合本 (简体)</button>
+          <button class="btn ${curTrans === 'CUV' ? 'btn-primary' : 'btn-secondary'} btn-online-fetch" data-trans="CUNPS">
+            <i class="fa-solid fa-cloud-arrow-down"></i> ${curTrans === 'CUV' ? '⚡ 在线获取和合本 (当前)' : '在线获取和合本 (简体)'}
+          </button>
+          <button class="btn ${curTrans === 'ESV' ? 'btn-primary' : 'btn-secondary'} btn-online-fetch" data-trans="ESV">
+            <i class="fa-solid fa-cloud-arrow-down"></i> ${curTrans === 'ESV' ? '⚡ 在线获取 ESV (当前)' : 'ESV 英文版'}
+          </button>
+          <button class="btn ${curTrans === 'NASB' ? 'btn-primary' : 'btn-secondary'} btn-online-fetch" data-trans="NASB">
+            <i class="fa-solid fa-cloud-arrow-down"></i> ${curTrans === 'NASB' ? '⚡ 在线获取 NASB (当前)' : 'NASB 英文版'}
+          </button>
+          <button class="btn ${curTrans === 'KJV' ? 'btn-primary' : 'btn-secondary'} btn-online-fetch" data-trans="KJV">
+            ${curTrans === 'KJV' ? '⚡ 在线获取 KJV (当前)' : 'KJV 英文版'}
+          </button>
           <button class="btn btn-secondary btn-online-fetch" data-trans="CUNP">和合本 (繁体)</button>
-          <button class="btn btn-secondary btn-online-fetch" data-trans="ESV">ESV 英文版</button>
-          <button class="btn btn-secondary btn-online-fetch" data-trans="NASB">NASB 英文版</button>
-          <button class="btn btn-secondary btn-online-fetch" data-trans="KJV">KJV 英文版</button>
         </div>
         <div class="online-loader-status" id="onlineLoaderStatus"></div>
       `;
@@ -2987,6 +3067,15 @@ class BibleWorkbenchApp {
           this.fetchOnlineChapter(btn.dataset.trans, this.currentBook, this.currentChapter);
         });
       });
+
+      const switchCuvBtn = card.querySelector("#btnSwitchToCachedCuv");
+      if (switchCuvBtn) {
+        switchCuvBtn.addEventListener("click", () => {
+          this.activeVersion = "CUV";
+          this.renderVersionTabs();
+          this.renderPassage();
+        });
+      }
 
       container.appendChild(card);
       return;
@@ -3087,14 +3176,42 @@ class BibleWorkbenchApp {
   }
 
   getVersesMap(versionId) {
+    const combined = {};
+
+    // 1. Built-in verses
     if (BUILTIN_DATA_VERSES[versionId]) {
-      return BUILTIN_DATA_VERSES[versionId];
+      Object.assign(combined, BUILTIN_DATA_VERSES[versionId]);
     }
-    const custom = this.customBibles.find(b => b.id === versionId);
-    if (custom && custom.verses) {
-      return custom.verses;
+
+    // 2. If CUV, also merge CUNPS or CUNP
+    if (versionId === "CUV") {
+      if (BUILTIN_DATA_VERSES["CUNPS"]) Object.assign(combined, BUILTIN_DATA_VERSES["CUNPS"]);
+      if (BUILTIN_DATA_VERSES["CUNP"]) Object.assign(combined, BUILTIN_DATA_VERSES["CUNP"]);
     }
-    return {};
+
+    // 3. Custom installed Bibles (e.g. from Cloud Library or user files)
+    const matches = this.customBibles.filter(b => 
+      b.id === versionId || 
+      (versionId === "CUV" && (b.id === "CUNPS" || b.id === "CUNP")) ||
+      (versionId === b.id)
+    );
+    matches.forEach(m => {
+      if (m.verses) Object.assign(combined, m.verses);
+    });
+
+    // 4. Online cached chapters
+    if (this.onlineCacheMemory) {
+      this.onlineCacheMemory.forEach(entry => {
+        const trans = entry.translation;
+        if (trans === versionId || (versionId === "CUV" && (trans === "CUNPS" || trans === "CUNP"))) {
+          if (entry.versesMap) {
+            Object.assign(combined, entry.versesMap);
+          }
+        }
+      });
+    }
+
+    return combined;
   }
 
   setActiveVerse(v) {
@@ -3706,35 +3823,65 @@ class BibleWorkbenchApp {
         throw new Error("未获取到有效经文数据");
       }
 
-      const targetMap = BUILTIN_DATA_VERSES["CUV"];
+      // Build versesMap for the downloaded translation
+      const vMap = {};
+      const targetIds = [trans];
+      if (trans === "CUNPS" || trans === "CUNP") targetIds.push("CUV");
+
       data.forEach(item => {
         const v = item.verse;
         let txt = item.text.replace(/<[^>]+>/g, "").trim();
         if (trans.startsWith("CU") || trans.startsWith("Chi")) {
           txt = txt.replace(/\s+/g, "");
         }
-        targetMap[`${bookNo}-${chapNo}-${v}`] = txt;
+        const k = `${bookNo}-${chapNo}-${v}`;
+        vMap[k] = txt;
+
+        targetIds.forEach(tid => {
+          if (!BUILTIN_DATA_VERSES[tid]) BUILTIN_DATA_VERSES[tid] = {};
+          BUILTIN_DATA_VERSES[tid][k] = txt;
+        });
+
+        if (item.comment) {
+          if (!BUILTIN_BOOK_COMMENTARIES["burdick"].books[String(bookNo)]) {
+            BUILTIN_BOOK_COMMENTARIES["burdick"].books[String(bookNo)] = {};
+          }
+          BUILTIN_BOOK_COMMENTARIES["burdick"].books[String(bookNo)][String(v)] = item.comment;
+        }
       });
 
-      await db.saveOnlineCache({
+      const cacheObj = {
         id: `${trans}-${bookNo}-${chapNo}`,
         translation: trans,
         book: bookNo,
         chapter: chapNo,
         verses: data,
+        versesMap: vMap,
         updatedAt: new Date().toISOString()
-      });
+      };
+
+      if (!this.onlineCacheMemory) this.onlineCacheMemory = new Map();
+      this.onlineCacheMemory.set(cacheObj.id, cacheObj);
+      await db.saveOnlineCache(cacheObj);
 
       if (statusEl) {
         statusEl.className = "online-loader-status status-msg success";
-        statusEl.innerHTML = `✅ 成功下载并缓存 ${data.length} 节经文！已就绪。`;
+        statusEl.innerHTML = `✅ 成功下载并缓存【${trans}】${data.length} 节经文！已就绪。`;
       }
 
-      showToast(`已成功在线加载并缓存 ${data.length} 节经文！`, "✅");
+      // If active version was not matching the downloaded one, auto-switch to the newly downloaded version
+      const targetSwitch = (trans === "CUNPS" || trans === "CUNP") ? "CUV" : trans;
+      if (this.activeVersion !== targetSwitch && this.activeVersion !== "PARALLEL") {
+        this.activeVersion = targetSwitch;
+        this.renderVersionTabs();
+      }
+
+      showToast(`已成功在线下载并缓存【${targetSwitch}】${data.length} 节经文！`, "✅");
       setTimeout(() => {
         this.renderPassage();
         this.renderParallelPassage();
-      }, 400);
+        this.renderCommentary();
+      }, 250);
     } catch (err) {
       if (statusEl) {
         statusEl.className = "online-loader-status status-msg error";
@@ -5104,11 +5251,17 @@ class BibleWorkbenchApp {
       footerEl.style.display = "flex";
       closeX.style.display = "inline-flex";
 
+      // If user installed a bible, set activeVersion to this bible
+      if (item.type === "bible") {
+        this.activeVersion = (item.id === "CUNPS" || item.id === "CUNP") ? "CUV" : item.id;
+      }
+
       this.renderCloudLibrary();
       this.renderVersionTabs();
       this.renderCommentaryTabs();
       this.renderPassage();
       this.renderParallelPassage();
+      this.renderCommentary();
 
       showToast(`🎉 全本【${item.name}】已成功安装并永久离线就绪！`, "✅");
     } catch (err) {
