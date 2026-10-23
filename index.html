@@ -20,24 +20,48 @@
         </div>
       </div>
 
-      <!-- Book, Chapter, Verse selector -->
+      <!-- Book, Chapter, Verse selector & Quick Jumper -->
       <div class="nav-controls">
         <select id="bookSelect" class="select-input" title="选择书卷"></select>
         <select id="chapterSelect" class="select-input select-num" title="选择章节"></select>
         <select id="verseSelect" class="select-input select-num" title="选择经节"></select>
         <button id="btnPrevChapter" class="btn-icon" title="上一章 (快捷键: [ 或 ←)"><i class="fa-solid fa-chevron-left"></i></button>
         <button id="btnNextChapter" class="btn-icon" title="下一章 (快捷键: ] 或 →)"><i class="fa-solid fa-chevron-right"></i></button>
+        <button id="btnOpenQuickJumper" class="btn btn-sm btn-ghost btn-jumper-trigger" title="经文全局速查 (快捷键: ⌘K / Ctrl+K)">
+          <i class="fa-solid fa-magnifying-glass"></i> <span class="hide-mobile">速查</span> <kbd class="kbd-badge">⌘K</kbd>
+        </button>
       </div>
     </div>
 
-    <!-- Center layout controls -->
+    <!-- Center layout controls & Audio TTS Player -->
     <div class="header-center">
+      <!-- Audio TTS Reader Widget -->
+      <div class="audio-player-widget" id="audioPlayerWidget">
+        <button id="btnTtsPlayPause" class="btn btn-sm btn-secondary" title="开始/暂停朗读当前章节 (快捷键: 空格)">
+          <i class="fa-solid fa-play" id="ttsPlayIcon"></i> <span id="ttsBtnText">朗读</span>
+        </button>
+        <button id="btnTtsStop" class="btn-icon btn-sm" title="停止朗读" style="display:none;">
+          <i class="fa-solid fa-stop"></i>
+        </button>
+        <select id="ttsRateSelect" class="select-input select-sm" title="朗读语速">
+          <option value="0.8">0.8x</option>
+          <option value="1.0" selected>1.0x</option>
+          <option value="1.2">1.2x</option>
+          <option value="1.5">1.5x</option>
+        </select>
+        <span class="tts-status-badge" id="ttsStatusBadge" style="display:none;">
+          <i class="fa-solid fa-volume-high"></i> <span id="ttsStatusText">第 1 节</span>
+        </span>
+      </div>
+
+      <!-- Layout toggles -->
       <div class="layout-toggle-group">
         <button class="btn-toggle" id="toggleOutlineBtn" title="显示/隐藏大纲栏"><i class="fa-solid fa-list-tree"></i> 大纲</button>
         <button class="btn-toggle" id="toggleCommentaryBtn" title="显示/隐藏导论与注释栏"><i class="fa-solid fa-book-open-reader"></i> 导论/注释</button>
         <button class="btn-toggle" id="toggleDrawerBtn" title="显示/隐藏检索与原文字典"><i class="fa-solid fa-magnifying-glass"></i> 检索/词典</button>
       </div>
 
+      <!-- Presets -->
       <div class="workspace-modes" title="工作区预设模式">
         <span class="mode-label">预设:</span>
         <button class="btn-mode active" data-mode="1" title="模式 1: 经典三栏 (大纲 20% | 经文 50% | 注释 30%)">1</button>
@@ -74,7 +98,7 @@
   <!-- Main Multi-Panel Workspace -->
   <main class="workbench-container" id="workbenchContainer">
 
-    <!-- Left Panel: Outlines, Cross References, Background Charts -->
+    <!-- Left Panel: Outlines, Cross References, Background Charts, Highlights, Personal Notes -->
     <aside class="panel left-panel" id="leftPanel">
       <div class="panel-header">
         <div class="panel-tabs">
@@ -82,6 +106,8 @@
           <button class="tab-btn" data-left-tab="structOutline">结构大纲</button>
           <button class="tab-btn" data-left-tab="crossRef">串珠经文</button>
           <button class="tab-btn" data-left-tab="backgroundCharts">图表与背景</button>
+          <button class="tab-btn" data-left-tab="myHighlights"><i class="fa-solid fa-highlighter"></i> 高亮标注</button>
+          <button class="tab-btn" data-left-tab="myNotes"><i class="fa-solid fa-pen-to-square"></i> 研经札记</button>
         </div>
       </div>
       <div class="panel-body outline-content" id="leftPanelBody">
@@ -105,9 +131,17 @@
       <!-- Main Bible Reading View -->
       <div class="panel-body bible-body" id="bibleView">
         <div class="passage-header" id="passageTitleHeader">
-          <h2 id="currentPassageTitle">约翰三书 第 1 章</h2>
-          <span class="passage-meta" id="currentPassageMeta">现代标点和合本 (CUV)</span>
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div>
+              <h2 id="currentPassageTitle">约翰三书 第 1 章</h2>
+              <span class="passage-meta" id="currentPassageMeta">现代标点和合本 (CUV)</span>
+            </div>
+            <div class="passage-quick-actions">
+              <button class="btn btn-sm btn-ghost" id="btnCopyPassage" title="复制本章全部经文"><i class="fa-solid fa-copy"></i> 复制本章</button>
+            </div>
+          </div>
         </div>
+
         <div class="verses-list" id="versesContainer">
           <!-- Verses rendered here -->
         </div>
@@ -128,7 +162,7 @@
           <!-- Search View -->
           <div class="drawer-view active" id="drawerViewSearch">
             <div class="search-bar">
-              <input type="text" id="searchInput" class="search-input" placeholder="输入经文关键字（如：真理、该犹、爱、善）或 Strong 编号（如 G225）回车检索...">
+              <input type="text" id="searchInput" class="search-input" placeholder="输入经文关键字（如：真理、该犹、爱、善、道）或 Strong 编号（如 G225、H7225）回车检索...">
               <select id="searchVersionSelect" class="select-input select-sm"></select>
               <button id="btnRunSearch" class="btn btn-primary btn-sm"><i class="fa-solid fa-search"></i> 查找</button>
             </div>
@@ -140,7 +174,7 @@
           <div class="drawer-view" id="drawerViewLexicon">
             <div class="lexicon-content" id="lexiconContent">
               <div class="lexicon-placeholder">
-                <i class="fa-solid fa-hand-pointer"></i> 在经文汇编译本中点击任意 Strong's 原文编号（如 <code>G4245</code>, <code>G27</code>, <code>G225</code>）查看原文形态与词典详解。
+                <i class="fa-solid fa-hand-pointer"></i> 在经文汇编译本中点击任意 Strong's 原文编号（如 <code>G4245</code>, <code>G27</code>, <code>G225</code>, <code>H7225</code>, <code>H430</code>）查看原文形态与词典详解。
               </div>
             </div>
           </div>
@@ -181,6 +215,110 @@
     </aside>
 
   </main>
+
+  <!-- Floating Verse Action Bar (Highlight, Note, Copy, Speak, Share Card) -->
+  <div class="verse-floating-bar" id="verseFloatingBar" style="display:none;">
+    <div class="color-picker-group">
+      <button class="btn-hl-color hl-dot-yellow" data-color="yellow" title="灵修感悟 (金黄)"></button>
+      <button class="btn-hl-color hl-dot-green" data-color="green" title="神的应许 (嫩绿)"></button>
+      <button class="btn-hl-color hl-dot-blue" data-color="blue" title="纯正真理 (蔚蓝)"></button>
+      <button class="btn-hl-color hl-dot-red" data-color="red" title="恩典救赎 (赤红)"></button>
+      <button class="btn-hl-color hl-dot-purple" data-color="purple" title="诫命警勉 (尊紫)"></button>
+      <button class="btn-hl-color hl-dot-clear" data-color="none" title="清除高亮"><i class="fa-solid fa-ban"></i></button>
+    </div>
+    <div class="verse-bar-divider"></div>
+    <button class="verse-bar-btn" id="btnBarNote" title="编写灵修札记"><i class="fa-solid fa-pen-to-square"></i> 札记</button>
+    <button class="verse-bar-btn" id="btnBarCopy" title="复制引用经文"><i class="fa-solid fa-copy"></i> 复制</button>
+    <button class="verse-bar-btn" id="btnBarSpeak" title="朗读此节经文"><i class="fa-solid fa-volume-high"></i> 朗读</button>
+    <button class="verse-bar-btn" id="btnBarCard" title="生成经文分享卡片"><i class="fa-solid fa-image"></i> 卡片</button>
+  </div>
+
+  <!-- Modal: Quick Jumper (Command Palette Cmd+K) -->
+  <div class="modal-backdrop" id="quickJumperModal" style="display:none;">
+    <div class="quick-jumper-dialog">
+      <div class="quick-jumper-input-wrap">
+        <i class="fa-solid fa-magnifying-glass quick-jumper-icon"></i>
+        <input type="text" id="quickJumperInput" class="quick-jumper-input" placeholder="输入经文简称或全称，如：创 1、诗 23:1、约 3:16、罗 8:28、Jn 1:1..." autocomplete="off">
+        <span class="quick-jumper-esc-badge" id="btnCloseQuickJumper">ESC</span>
+      </div>
+      <div class="quick-jumper-results" id="quickJumperResults"></div>
+      <div class="quick-jumper-footer">
+        <span>按 <kbd>Enter</kbd> 跳转</span>
+        <span>按 <kbd>↑</kbd> <kbd>↓</kbd> 选择</span>
+        <span>按 <kbd>ESC</kbd> 退出</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Parallel Bible Configurator -->
+  <div class="modal-backdrop" id="parallelConfigModal" style="display:none;">
+    <div class="modal-dialog" style="max-width:540px;">
+      <div class="modal-header">
+        <div class="modal-title"><i class="fa-solid fa-sliders"></i> 多译本并排比对配置</div>
+        <button class="btn-icon" id="btnCloseParallelModal"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body" style="padding:18px;">
+        <p class="text-secondary">勾选你想在多译本并排模式中同屏对照的译本（建议选择 2 至 5 个译本）：</p>
+        <div class="parallel-options-list" id="parallelOptionsList"></div>
+      </div>
+      <div class="modal-footer-actions" style="padding:14px 18px; border-top:1px solid var(--border-color); justify-content:flex-end;">
+        <button class="btn btn-secondary" id="btnCancelParallelConfig">取消</button>
+        <button class="btn btn-primary" id="btnSaveParallelConfig">应用配置</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Note Editor Modal -->
+  <div class="modal-backdrop" id="noteEditorModal" style="display:none;">
+    <div class="modal-dialog" style="max-width:620px;">
+      <div class="modal-header">
+        <div class="modal-title"><i class="fa-solid fa-pen-to-square"></i> <span id="noteModalTitle">研经札记</span></div>
+        <button class="btn-icon" id="btnCloseNoteModal"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body" style="padding:18px;">
+        <div class="note-verse-preview" id="noteModalVerseText"></div>
+        <div class="form-group" style="margin-top:12px;">
+          <label>个人研经体会与灵修心得 (支持 Markdown):</label>
+          <textarea id="noteTextInput" class="code-textarea" rows="8" placeholder="在此写下您对本节经文的灵修感动、神学观察、原文字义剖析或讲道应用..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer-actions" style="padding:14px 18px; border-top:1px solid var(--border-color); justify-content:space-between;">
+        <button class="btn btn-danger btn-sm" id="btnDeleteNote"><i class="fa-solid fa-trash-can"></i> 删除此笔记</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-secondary" id="btnCancelNote">取消</button>
+          <button class="btn btn-primary" id="btnSaveNote"><i class="fa-solid fa-check"></i> 保存札记</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Scripture Share Card Generator -->
+  <div class="modal-backdrop" id="scriptureCardModal" style="display:none;">
+    <div class="modal-dialog" style="max-width:600px;">
+      <div class="modal-header">
+        <div class="modal-title"><i class="fa-solid fa-image"></i> 经文精美分享卡片</div>
+        <button class="btn-icon" id="btnCloseCardModal"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body" style="padding:20px; text-align:center;">
+        <div class="card-theme-bar">
+          <span>卡片风格：</span>
+          <button class="btn btn-xs btn-ghost active card-style-btn" data-card-theme="card-light">清新浅色</button>
+          <button class="btn btn-xs btn-ghost card-style-btn" data-card-theme="card-sepia">古典羊皮</button>
+          <button class="btn btn-xs btn-ghost card-style-btn" data-card-theme="card-dark">幽邃深色</button>
+        </div>
+        <div class="scripture-card-canvas" id="scriptureCardCanvas">
+          <div class="card-quote-mark">“</div>
+          <div class="card-verse-body" id="cardVerseBody">经文内容</div>
+          <div class="card-verse-ref" id="cardVerseRef">—— 约翰福音 1:1 · 现代标点和合本</div>
+          <div class="card-watermark">研经工作台 | Bible Study Workbench</div>
+        </div>
+      </div>
+      <div class="modal-footer-actions" style="padding:14px 18px; border-top:1px solid var(--border-color); justify-content:space-between;">
+        <button class="btn btn-secondary btn-sm" id="btnCopyCardMarkdown"><i class="fa-solid fa-copy"></i> 复制 Markdown 引用</button>
+        <button class="btn btn-primary btn-sm" id="btnCopyCardText"><i class="fa-solid fa-copy"></i> 复制文本引用</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Modal: Import & Resource Manager -->
   <div class="modal-backdrop" id="manageModal" style="display:none;">
@@ -355,6 +493,12 @@
       <button class="btn btn-xs btn-primary" id="btnPopoverSearch"><i class="fa-solid fa-magnifying-glass"></i> 在圣经中查找此原文</button>
       <button class="btn btn-xs btn-ghost" id="btnPopoverDetails"><i class="fa-solid fa-arrow-up-right-from-square"></i> 在词典抽屉中打开</button>
     </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast">
+    <span id="toastIcon">✅</span>
+    <span id="toastMsg">通知信息</span>
   </div>
 
   <!-- Scripts -->
