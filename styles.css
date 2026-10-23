@@ -1955,3 +1955,229 @@ body[data-layout="4"] #panel-commentary { display: flex; width: 23%; }
   align-items: center;
   gap: 6px;
 }
+
+/* =========================================================
+   Mobile iOS & macOS Device Recognition, Mobile Reading Layout,
+   and Touch Hold-and-Drag Styling
+   ========================================================= */
+
+/* Desktop only elements hide on mobile */
+.btn-device-toggle {
+  font-size: 11px;
+  border: 1px solid var(--border-color);
+  padding: 3px 8px;
+  border-radius: 14px;
+}
+
+/* Mobile Bottom Tab Bar (hidden on desktop macOS by default) */
+.mobile-tab-bar {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid var(--border-color);
+  z-index: 1000;
+  align-items: center;
+  justify-content: space-around;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  user-select: none;
+}
+
+body.theme-sepia .mobile-tab-bar {
+  background: rgba(251, 247, 238, 0.92);
+}
+
+body.theme-dark .mobile-tab-bar {
+  background: rgba(24, 25, 29, 0.92);
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+.mobile-tab-btn {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px;
+  gap: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 4px 0;
+}
+
+.mobile-tab-btn i {
+  font-size: 16px;
+  transition: transform 0.15s ease;
+}
+
+.mobile-tab-btn.active {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.mobile-tab-btn.active i {
+  transform: scale(1.12);
+}
+
+/* Touch dragging visual elevation */
+.draggable-panel.touch-dragging {
+  z-index: 9999 !important;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.3) !important;
+  opacity: 0.92 !important;
+  transform: scale(1.02) !important;
+  pointer-events: none !important;
+  transition: none !important;
+}
+
+.draggable-panel.touch-drop-above {
+  border-top: 3px solid var(--primary) !important;
+}
+
+.draggable-panel.touch-drop-below {
+  border-bottom: 3px solid var(--primary) !important;
+}
+
+/* =========================================================
+   Mobile View Rules: Active when data-is-mobile="true"
+   OR on screens <= 768px
+   ========================================================= */
+@media (max-width: 768px), (pointer: coarse) and (max-width: 900px) {
+  body:not([data-force-desktop="true"]) .mobile-tab-bar {
+    display: flex !important;
+  }
+
+  body:not([data-force-desktop="true"]) .app-header {
+    padding: 0 10px;
+    height: 48px;
+  }
+
+  body:not([data-force-desktop="true"]) .brand-subtitle,
+  body:not([data-force-desktop="true"]) .btn-jumper-trigger .hide-mobile,
+  body:not([data-force-desktop="true"]) .btn-jumper-trigger .kbd-badge,
+  body:not([data-force-desktop="true"]) .header-center .layout-toggle-group,
+  body:not([data-force-desktop="true"]) .header-center .workspace-modes,
+  body:not([data-force-desktop="true"]) #btnSyncScrollToggle {
+    display: none !important;
+  }
+
+  body:not([data-force-desktop="true"]) #workbenchContainer {
+    height: calc(100vh - 48px - 56px - env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* Mobile Tabs View (Default mobile reading) */
+  body:not([data-force-desktop="true"]):not(.mobile-view-stack) #workbenchContainer {
+    overflow: hidden !important;
+  }
+
+  body:not([data-force-desktop="true"]):not(.mobile-view-stack) .draggable-panel {
+    display: none !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    height: 100% !important;
+    border-right: none !important;
+  }
+
+  body:not([data-force-desktop="true"]):not(.mobile-view-stack) .draggable-panel.mobile-active-panel {
+    display: flex !important;
+  }
+
+  /* Mobile Vertical Stack Mode (When user switches to 卡片堆叠) */
+  body:not([data-force-desktop="true"]).mobile-view-stack #workbenchContainer {
+    flex-direction: column !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 10px 8px !important;
+    gap: 12px !important;
+  }
+
+  body:not([data-force-desktop="true"]).mobile-view-stack .draggable-panel {
+    display: flex !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    height: auto !important;
+    max-height: 70vh !important;
+    border-radius: 12px !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: var(--shadow-sm) !important;
+    margin-bottom: 6px !important;
+  }
+
+  body:not([data-force-desktop="true"]).mobile-view-stack .draggable-panel.collapsed {
+    max-height: 44px !important;
+  }
+
+  body:not([data-force-desktop="true"]).mobile-view-stack .panel-header {
+    height: 44px !important;
+    border-radius: 12px 12px 0 0 !important;
+  }
+
+  body:not([data-force-desktop="true"]) .bible-body {
+    padding: 16px 14px !important;
+  }
+
+  body:not([data-force-desktop="true"]) .verse-floating-bar {
+    left: 10px !important;
+    right: 10px !important;
+    justify-content: space-around !important;
+    max-width: calc(100vw - 20px) !important;
+  }
+
+  body:not([data-force-desktop="true"]) .quick-jumper-dialog,
+  body:not([data-force-desktop="true"]) .modal-dialog {
+    max-width: 96vw !important;
+    margin: 10px !important;
+  }
+}
+
+/* Explicit forced mobile view on desktop */
+body[data-force-mobile="true"] .mobile-tab-bar {
+  display: flex !important;
+}
+
+body[data-force-mobile="true"] .header-center .layout-toggle-group,
+body[data-force-mobile="true"] .header-center .workspace-modes,
+body[data-force-mobile="true"] #btnSyncScrollToggle {
+  display: none !important;
+}
+
+body[data-force-mobile="true"] #workbenchContainer {
+  height: calc(100vh - 48px - 56px) !important;
+}
+
+body[data-force-mobile="true"]:not(.mobile-view-stack) .draggable-panel {
+  display: none !important;
+  width: 100% !important;
+  min-width: 100% !important;
+  height: 100% !important;
+}
+
+body[data-force-mobile="true"]:not(.mobile-view-stack) .draggable-panel.mobile-active-panel {
+  display: flex !important;
+}
+
+body[data-force-mobile="true"].mobile-view-stack #workbenchContainer {
+  flex-direction: column !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 10px 8px !important;
+  gap: 12px !important;
+}
+
+body[data-force-mobile="true"].mobile-view-stack .draggable-panel {
+  display: flex !important;
+  width: 100% !important;
+  min-width: 100% !important;
+  height: auto !important;
+  max-height: 70vh !important;
+  border-radius: 12px !important;
+  border: 1px solid var(--border-color) !important;
+}

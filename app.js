@@ -2678,6 +2678,7 @@ class BibleWorkbenchApp {
 
     // Drag-and-drop state
     this.draggedPanel = null;
+    this.activeMobilePanelId = "scripture";
   }
 
   async init() {
@@ -2705,6 +2706,9 @@ class BibleWorkbenchApp {
 
     // 4. Event Listeners & Feature Modules
     this.setupEventListeners();
+    this.detectDeviceAndOrientation();
+    this.setupDeviceModeToggle();
+    this.setupMobileTabBar();
     this.setupPanelDragAndDrop();
     this.setupScrollSync();
     this.setupQuickJumper();
@@ -3190,12 +3194,13 @@ class BibleWorkbenchApp {
   }
 
   // =========================================================
-  // Requirement 1: 5 Draggable Panels & Layout Persistence
+  // Requirement 1: 5 Draggable Panels & Touch Hold-and-Drag
   // =========================================================
   setupPanelDragAndDrop() {
     const container = document.getElementById("workbenchContainer");
     const panels = container.querySelectorAll(".draggable-panel");
 
+    // 1. Desktop HTML5 Drag and Drop
     panels.forEach(panel => {
       const handle = panel.querySelector(".drag-handle");
       if (!handle) return;
@@ -3246,6 +3251,92 @@ class BibleWorkbenchApp {
       });
     });
 
+    // 2. Mobile Touch & Pointer Hold-and-Drag (手机端/iOS 屏幕直接按住抓手拖曳)
+    panels.forEach(panel => {
+      const grip = panel.querySelector(".drag-grip") || panel.querySelector(".drag-handle");
+      if (!grip) return;
+
+      let touchTimer = null;
+      let isTouchDragging = false;
+      let startY = 0;
+      let startX = 0;
+      let currentOverPanel = null;
+
+      const clearTouchState = () => {
+        if (touchTimer) clearTimeout(touchTimer);
+        touchTimer = null;
+        if (isTouchDragging) {
+          panel.classList.remove("touch-dragging");
+          document.querySelectorAll(".draggable-panel").forEach(p => {
+            p.classList.remove("touch-drop-above", "touch-drop-below");
+          });
+          isTouchDragging = false;
+        }
+      };
+
+      grip.addEventListener("touchstart", (e) => {
+        if (e.touches.length !== 1) return;
+        const touch = e.touches[0];
+        startX = touch.clientX;
+        startY = touch.clientY;
+
+        touchTimer = setTimeout(() => {
+          isTouchDragging = true;
+          panel.classList.add("touch-dragging");
+          if (navigator.vibrate) navigator.vibrate(20);
+        }, 180);
+      }, { passive: true });
+
+      grip.addEventListener("touchmove", (e) => {
+        if (!isTouchDragging) {
+          if (touchTimer && (Math.abs(e.touches[0].clientY - startY) > 10 || Math.abs(e.touches[0].clientX - startX) > 10)) {
+            clearTimeout(touchTimer);
+            touchTimer = null;
+          }
+          return;
+        }
+
+        e.preventDefault(); // Prevent scrolling while touch dragging
+        const touch = e.touches[0];
+        const elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+        const targetPanel = elemBelow ? elemBelow.closest(".draggable-panel") : null;
+
+        document.querySelectorAll(".draggable-panel").forEach(p => {
+          p.classList.remove("touch-drop-above", "touch-drop-below");
+        });
+
+        if (targetPanel && targetPanel !== panel) {
+          currentOverPanel = targetPanel;
+          const rect = targetPanel.getBoundingClientRect();
+          const isBelow = (touch.clientY - rect.top) > (rect.height / 2);
+          if (isBelow) {
+            targetPanel.classList.add("touch-drop-below");
+          } else {
+            targetPanel.classList.add("touch-drop-above");
+          }
+        } else {
+          currentOverPanel = null;
+        }
+      }, { passive: false });
+
+      grip.addEventListener("touchend", () => {
+        if (isTouchDragging && currentOverPanel && currentOverPanel !== panel) {
+          const isBelow = currentOverPanel.classList.contains("touch-drop-below");
+          if (isBelow) {
+            currentOverPanel.after(panel);
+          } else {
+            currentOverPanel.before(panel);
+          }
+          this.saveCustomPanelLayout();
+          if (navigator.vibrate) navigator.vibrate(30);
+          showToast("📱 手机端窗口顺序已更新并保存！", "📐");
+        }
+        clearTouchState();
+      });
+
+      grip.addEventListener("touchcancel", clearTouchState);
+    });
+
     // Panel close/collapse buttons
     document.querySelectorAll(".panel-close-btn").forEach(btn => {
       btn.addEventListener("click", () => {
@@ -3290,9 +3381,146 @@ class BibleWorkbenchApp {
         if (confirm("是否重置窗口布局为默认次序与大小？")) {
           localStorage.removeItem("bible_workbench_panels_order");
           localStorage.removeItem("bible_workbench_panels_state");
+          localStorage.removeItem("bible_workbench_mobile_layout");
+          localStorage.removeItem("bible_workbench_device_mode");
           location.reload();
         }
       });
+    }
+  }
+
+  // =========================================================
+  // Device Detection: Desktop macOS vs iOS / Mobile
+  // =========================================================
+  detectDeviceAndOrientation() {
+    const ua = navigator.userAgent || "";
+    const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const isAndroid = /Android/i.test(ua);
+    const isMobileWidth = window.innerWidth <= 768;
+    const isMobileDevice = isIOS || isAndroid || isMobileWidth;
+
+    const savedMode = localStorage.getItem("bible_workbench_device_mode") || "auto";
+
+    let effectiveIsMobile = isMobileDevice;
+    if (savedMode === "mobile") effectiveIsMobile = true;
+    if (savedMode === "desktop") effectiveIsMobile = false;
+
+    document.body.dataset.device = isIOS ? "ios" : (isAndroid ? "android" : (navigator.platform.includes("Mac") ? "macos" : "desktop"));
+    document.body.dataset.isMobile = effectiveIsMobile ? "true" : "false";
+    document.body.dataset.forceMobile = (savedMode === "mobile") ? "true" : "false";
+    document.body.dataset.forceDesktop = (savedMode === "desktop") ? "true" : "false";
+
+    this.updateDeviceToggleUi(savedMode, isIOS, isMobileDevice);
+
+    if (effectiveIsMobile) {
+      const savedMobileLayout = localStorage.getItem("bible_workbench_mobile_layout") || "tabs";
+      document.body.classList.toggle("mobile-view-stack", savedMobileLayout === "stack");
+      this.updateMobileLayoutToggleUi(savedMobileLayout);
+      this.switchMobileTab(this.activeMobilePanelId || "scripture");
+    }
+  }
+
+  setupDeviceModeToggle() {
+    const btn = document.getElementById("btnDeviceModeToggle");
+    if (!btn) return;
+
+    btn.addEventListener("click", () => {
+      const cur = localStorage.getItem("bible_workbench_device_mode") || "auto";
+      let next = "auto";
+      if (cur === "auto") next = "mobile";
+      else if (cur === "mobile") next = "desktop";
+      else next = "auto";
+
+      localStorage.setItem("bible_workbench_device_mode", next);
+      this.detectDeviceAndOrientation();
+      const labels = { auto: "自动识别模式", mobile: "强制 iOS 手机视图", desktop: "强制 macOS 桌面视图" };
+      showToast(`已切换为【${labels[next]}】`, "📱");
+      this.renderPassage();
+      this.renderParallelPassage();
+    });
+
+    window.addEventListener("resize", () => {
+      this.detectDeviceAndOrientation();
+    });
+    window.addEventListener("orientationchange", () => {
+      setTimeout(() => this.detectDeviceAndOrientation(), 200);
+    });
+  }
+
+  updateDeviceToggleUi(mode, isIOS, isMobileDevice) {
+    const icon = document.getElementById("deviceModeIcon");
+    const text = document.getElementById("deviceModeText");
+    if (!icon || !text) return;
+
+    if (mode === "auto") {
+      icon.className = isIOS ? "fa-solid fa-mobile-screen-button" : (isMobileDevice ? "fa-solid fa-mobile-screen" : "fa-brands fa-apple");
+      text.textContent = isIOS ? "iOS 自动" : (isMobileDevice ? "手机自动" : "macOS 自动");
+    } else if (mode === "mobile") {
+      icon.className = "fa-solid fa-mobile-screen-button";
+      text.textContent = "iOS 手机";
+    } else {
+      icon.className = "fa-brands fa-apple";
+      text.textContent = "macOS 桌面";
+    }
+  }
+
+  // =========================================================
+  // Mobile Bottom Tab Bar & Split View
+  // =========================================================
+  setupMobileTabBar() {
+    const tabBtns = document.querySelectorAll(".mobile-tab-btn[data-mobile-panel]");
+    tabBtns.forEach(btn => {
+      btn.addEventListener("click", () => {
+        const panelId = btn.dataset.mobilePanel;
+        this.switchMobileTab(panelId);
+      });
+    });
+
+    const layoutToggleBtn = document.getElementById("btnMobileLayoutToggle");
+    if (layoutToggleBtn) {
+      layoutToggleBtn.addEventListener("click", () => {
+        const isStack = document.body.classList.contains("mobile-view-stack");
+        const next = isStack ? "tabs" : "stack";
+        document.body.classList.toggle("mobile-view-stack", next === "stack");
+        localStorage.setItem("bible_workbench_mobile_layout", next);
+        this.updateMobileLayoutToggleUi(next);
+        showToast(next === "stack" ? "已切换为【卡片堆叠模式】可上下长按拖曳重排" : "已切换为【分页面板模式】", "📑");
+      });
+    }
+  }
+
+  switchMobileTab(panelId) {
+    this.activeMobilePanelId = panelId;
+
+    document.querySelectorAll(".mobile-tab-btn[data-mobile-panel]").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.mobilePanel === panelId);
+    });
+
+    if (!document.body.classList.contains("mobile-view-stack")) {
+      document.querySelectorAll(".draggable-panel").forEach(p => {
+        const pid = p.dataset.panelId || p.id.replace("panel-", "");
+        if (pid === panelId) {
+          p.classList.add("mobile-active-panel");
+          p.style.display = "flex";
+        } else {
+          p.classList.remove("mobile-active-panel");
+          p.style.display = "none";
+        }
+      });
+    }
+  }
+
+  updateMobileLayoutToggleUi(layout) {
+    const text = document.getElementById("mobileLayoutModeText");
+    const icon = document.getElementById("mobileLayoutIcon");
+    if (!text || !icon) return;
+
+    if (layout === "stack") {
+      text.textContent = "分页面板";
+      icon.className = "fa-solid fa-table-cells-large";
+    } else {
+      text.textContent = "卡片堆叠";
+      icon.className = "fa-solid fa-layer-group";
     }
   }
 

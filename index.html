@@ -82,6 +82,10 @@
 
     <!-- Right utility controls -->
     <div class="header-right">
+      <button class="btn btn-sm btn-ghost btn-device-toggle" id="btnDeviceModeToggle" title="切换设备视图模式 (自动识别 / iOS 手机模式 / macOS 桌面模式)">
+        <i class="fa-solid fa-mobile-screen" id="deviceModeIcon"></i> <span id="deviceModeText">自动</span>
+      </button>
+
       <div class="theme-controls">
         <button id="btnFontDec" class="btn-icon btn-sm" title="缩小字号">A-</button>
         <button id="btnFontInc" class="btn-icon btn-sm" title="放大字号">A+</button>
@@ -251,6 +255,34 @@
     </aside>
 
   </main>
+
+  <!-- iOS Mobile Bottom Tab Bar -->
+  <nav class="mobile-tab-bar" id="mobileTabBar">
+    <button class="mobile-tab-btn" data-mobile-panel="outline" title="大纲与札记">
+      <i class="fa-solid fa-list-tree"></i>
+      <span>大纲</span>
+    </button>
+    <button class="mobile-tab-btn active" data-mobile-panel="scripture" title="主读经文">
+      <i class="fa-solid fa-book-bible"></i>
+      <span>经文</span>
+    </button>
+    <button class="mobile-tab-btn" data-mobile-panel="parallel" title="对照经文">
+      <i class="fa-solid fa-table-columns"></i>
+      <span>对照</span>
+    </button>
+    <button class="mobile-tab-btn" data-mobile-panel="intro" title="导论与历史背景">
+      <i class="fa-solid fa-compass"></i>
+      <span>导论</span>
+    </button>
+    <button class="mobile-tab-btn" data-mobile-panel="commentary" title="逐节经文注释">
+      <i class="fa-solid fa-book-open-reader"></i>
+      <span>注释</span>
+    </button>
+    <button class="mobile-tab-btn" id="btnMobileLayoutToggle" title="切换手机卡片堆叠/分页面板">
+      <i class="fa-solid fa-layer-group" id="mobileLayoutIcon"></i>
+      <span id="mobileLayoutModeText">卡片堆叠</span>
+    </button>
+  </nav>
 
   <!-- Floating Verse Action Bar (Highlight, Note, Copy, Speak, Share Card) -->
   <div class="verse-floating-bar" id="verseFloatingBar" style="display:none;">
