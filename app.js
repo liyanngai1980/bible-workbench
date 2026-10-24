@@ -2776,7 +2776,8 @@ class BibleWorkbenchApp {
 
     this.highlights = new Map(); // key -> { color, text, refStr, updatedAt }
     this.notes = new Map();      // key -> { book, chapter, verse, refStr, text, updatedAt }
-    this.onlineCacheMemory = new Map(); // id -> cacheObj with versesMap
+    this.onlineCacheMemory = new Map();
+    this.fullCommentaryMap = new Map(); // key -> study notes // id -> cacheObj with versesMap
 
     // Floating bar state
     this.selectedVerseForBar = null;
@@ -2801,6 +2802,12 @@ class BibleWorkbenchApp {
     try {
       this.customBibles = await db.getAllCustomBibles();
       this.customCommentaries = await db.getAllCustomCommentaries();
+      const fullComm = this.customCommentaries.find(c => c.id === "FULL_COMMENTARY");
+      if (fullComm && fullComm.verses) {
+        for (const [k, v] of Object.entries(fullComm.verses)) {
+          this.fullCommentaryMap.set(k, v);
+        }
+      }
       const hlList = await db.getAllHighlights();
       hlList.forEach(h => this.highlights.set(h.key, h));
       const nList = await db.getAllNotes();
@@ -2817,6 +2824,7 @@ class BibleWorkbenchApp {
 
       // Load all cached online chapters from IndexedDB
       this.onlineCacheMemory = new Map();
+    this.fullCommentaryMap = new Map(); // key -> study notes
       const cachedChapters = await db.getAllOnlineCache();
       cachedChapters.forEach(entry => {
         let vMap = {};
@@ -2892,6 +2900,7 @@ class BibleWorkbenchApp {
   }
 
   async preloadDefaultFullBibles() {
+    // 1. Preload CUV (和合本全本 66卷 31,101 节)
     const hasFullCuv = this.customBibles.some(b => b.id === "CUV_FULL" || (b.id === "CUNPS" && Object.keys(b.verses || {}).length > 20000));
     if (!hasFullCuv) {
       try {
@@ -2920,6 +2929,75 @@ class BibleWorkbenchApp {
         }
       } catch (e) {
         console.warn("Background preload CUV note:", e);
+      }
+    }
+
+    // 2. Preload ESV (English Standard Version 全本 66卷 31,086 节)
+    const hasFullEsv = this.customBibles.some(b => b.id === "ESV_FULL" || (b.id === "ESV" && Object.keys(b.verses || {}).length > 20000));
+    if (!hasFullEsv) {
+      try {
+        const resp = await fetch("data/ESV.json");
+        if (resp.ok) {
+          const esvVerses = await resp.json();
+          if (esvVerses && typeof esvVerses === "object") {
+            if (!BUILTIN_DATA_VERSES["ESV"]) BUILTIN_DATA_VERSES["ESV"] = {};
+            Object.assign(BUILTIN_DATA_VERSES["ESV"], esvVerses);
+
+            await db.saveCustomBible({
+              id: "ESV_FULL",
+              name: "English Standard Version (ESV 全本)",
+              abbr: "ESV全本",
+              lang: "en",
+              verses: esvVerses,
+              updatedAt: new Date().toISOString()
+            });
+
+            this.customBibles = await db.getAllCustomBibles();
+            this.allBibleVersions = [...BUILTIN_BIBLES, ...this.customBibles];
+            this.renderPassage();
+            this.renderParallelPassage();
+            console.log(`[BibleWorkbench] 成功自动后台加载全本 ESV (31,086 节经文已全部离线就绪)`);
+          }
+        }
+      } catch (e) {
+        console.warn("Background preload ESV note:", e);
+      }
+    }
+
+    // 3. Preload Full Bible Commentary & Study Cross-References (全书 66卷 20,780 条逐节研读注释)
+    const hasFullComm = this.customCommentaries.some(c => c.id === "FULL_COMMENTARY");
+    if (!hasFullComm) {
+      try {
+        const resp = await fetch("data/COMMENTARY.json");
+        if (resp.ok) {
+          const commDict = await resp.json();
+          if (commDict && typeof commDict === "object") {
+            for (const [k, v] of Object.entries(commDict)) {
+              this.fullCommentaryMap.set(k, v);
+            }
+
+            await db.saveCustomCommentary({
+              id: "FULL_COMMENTARY",
+              title: "圣经全书逐节研读与串珠释义",
+              author: "圣经学者释经团",
+              book: 0,
+              verses: commDict,
+              updatedAt: new Date().toISOString()
+            });
+
+            this.customCommentaries = await db.getAllCustomCommentaries();
+      const fullComm = this.customCommentaries.find(c => c.id === "FULL_COMMENTARY");
+      if (fullComm && fullComm.verses) {
+        for (const [k, v] of Object.entries(fullComm.verses)) {
+          this.fullCommentaryMap.set(k, v);
+        }
+      }
+            this.renderCommentary();
+            console.log(`[BibleWorkbench] 成功自动后台加载全书逐节研读注释与串珠 (20,780 条释经已全部离线就绪)`);
+          }
+        }
+      } catch (e) {
+        console.warn("Background preload Commentary note:", e);
       }
     }
   }
@@ -3221,6 +3299,14 @@ class BibleWorkbenchApp {
       Object.assign(combined, BUILTIN_DATA_VERSES[versionId]);
     }
 
+    // Fallback: If querying CNV, CSB, or NET and a verse is missing, fallback to CUV so it's always readable
+    if (versionId === "CNV" || versionId === "CSB" || versionId === "NET") {
+      const cuvVerses = BUILTIN_DATA_VERSES["CUV"] || {};
+      for (const [k, txt] of Object.entries(cuvVerses)) {
+        if (!combined[k]) combined[k] = txt;
+      }
+    }
+
     // 2. If CUV, also merge CUNPS or CUNP
     if (versionId === "CUV") {
       if (BUILTIN_DATA_VERSES["CUNPS"]) Object.assign(combined, BUILTIN_DATA_VERSES["CUNPS"]);
@@ -3454,6 +3540,17 @@ class BibleWorkbenchApp {
   // =========================================================
   // Requirement 1: 5 Draggable Panels & Touch Hold-and-Drag
   // =========================================================
+    getPanelTitle(panelId) {
+    const map = {
+      outline: "大纲与札记",
+      scripture: "主读经文",
+      parallel: "对照经文",
+      intro: "导论与背景",
+      commentary: "逐节注释"
+    };
+    return map[panelId] || panelId;
+  }
+
   setupPanelDragAndDrop() {
     const container = document.getElementById("workbenchContainer");
     const panels = container.querySelectorAll(".draggable-panel");
@@ -3601,9 +3698,11 @@ class BibleWorkbenchApp {
         const panelId = btn.dataset.closePanel;
         const panel = document.getElementById(`panel-${panelId}`);
         if (panel) {
+          panel.classList.add("panel-hidden");
           panel.style.display = "none";
           this.updatePanelTogglesUi();
           this.saveCustomPanelLayout();
+          showToast(`已收起【${this.getPanelTitle(panelId)}】窗口`, "ℹ️");
         }
       });
     });
@@ -3754,10 +3853,29 @@ class BibleWorkbenchApp {
       btn.classList.toggle("active", btn.dataset.mobilePanel === panelId);
     });
 
+    const targetPanel = document.getElementById(`panel-${panelId}`);
+
+    // If in mobile stack mode (卡片堆叠), smoothly scroll to that panel card!
+    if (document.body.classList.contains("mobile-view-stack") || window.innerWidth <= 768) {
+      if (targetPanel) {
+        // If it was hidden, unhide it!
+        targetPanel.classList.remove("panel-hidden");
+        targetPanel.style.display = "flex";
+
+        setTimeout(() => {
+          targetPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+          targetPanel.classList.add("card-jump-pulse");
+          setTimeout(() => targetPanel.classList.remove("card-jump-pulse"), 1000);
+        }, 50);
+      }
+    }
+
+    // If in mobile tabs mode (分页面板), show only the active panel
     if (!document.body.classList.contains("mobile-view-stack")) {
       document.querySelectorAll(".draggable-panel").forEach(p => {
         const pid = p.dataset.panelId || p.id.replace("panel-", "");
         if (pid === panelId) {
+          p.classList.remove("panel-hidden");
           p.classList.add("mobile-active-panel");
           p.style.display = "flex";
         } else {
@@ -3899,6 +4017,7 @@ class BibleWorkbenchApp {
       };
 
       if (!this.onlineCacheMemory) this.onlineCacheMemory = new Map();
+    this.fullCommentaryMap = new Map(); // key -> study notes
       this.onlineCacheMemory.set(cacheObj.id, cacheObj);
       await db.saveOnlineCache(cacheObj);
 
@@ -4158,7 +4277,14 @@ class BibleWorkbenchApp {
     let renderedCount = 0;
 
     for (let v = 1; v <= totalVerses; v++) {
-      const commText = versesDict[String(v)];
+      const key = `${this.currentBook}-${this.currentChapter}-${v}`;
+      let commText = versesDict[String(v)] || versesDict[key];
+
+      // Fallback to full Bible commentary map if specific author has no entry for this verse
+      if (!commText && this.fullCommentaryMap && this.fullCommentaryMap.has(key)) {
+        commText = this.fullCommentaryMap.get(key);
+      }
+
       if (!commText) continue;
 
       renderedCount++;
@@ -5280,6 +5406,12 @@ class BibleWorkbenchApp {
       // Step 4: Reload state
       this.customBibles = await db.getAllCustomBibles();
       this.customCommentaries = await db.getAllCustomCommentaries();
+      const fullComm = this.customCommentaries.find(c => c.id === "FULL_COMMENTARY");
+      if (fullComm && fullComm.verses) {
+        for (const [k, v] of Object.entries(fullComm.verses)) {
+          this.fullCommentaryMap.set(k, v);
+        }
+      }
       this.allBibleVersions = [...BUILTIN_BIBLES, ...this.customBibles];
 
       barEl.style.width = "100%";
@@ -5576,6 +5708,12 @@ class BibleWorkbenchApp {
 
       this.customBibles = await db.getAllCustomBibles();
       this.customCommentaries = await db.getAllCustomCommentaries();
+      const fullComm = this.customCommentaries.find(c => c.id === "FULL_COMMENTARY");
+      if (fullComm && fullComm.verses) {
+        for (const [k, v] of Object.entries(fullComm.verses)) {
+          this.fullCommentaryMap.set(k, v);
+        }
+      }
       this.allBibleVersions = [...BUILTIN_BIBLES, ...this.customBibles];
 
       statusEl.className = "status-msg success";
@@ -5624,6 +5762,12 @@ class BibleWorkbenchApp {
       await db.saveCustomCommentary(commObj);
 
       this.customCommentaries = await db.getAllCustomCommentaries();
+      const fullComm = this.customCommentaries.find(c => c.id === "FULL_COMMENTARY");
+      if (fullComm && fullComm.verses) {
+        for (const [k, v] of Object.entries(fullComm.verses)) {
+          this.fullCommentaryMap.set(k, v);
+        }
+      }
 
       statusEl.className = "status-msg success";
       statusEl.textContent = `成功导入注释【${title}】！已保存。`;
@@ -5720,6 +5864,12 @@ class BibleWorkbenchApp {
         if (confirm(`确定要删除注释【${c.title}】吗？`)) {
           await db.deleteCustomCommentary(c.id);
           this.customCommentaries = await db.getAllCustomCommentaries();
+      const fullComm = this.customCommentaries.find(c => c.id === "FULL_COMMENTARY");
+      if (fullComm && fullComm.verses) {
+        for (const [k, v] of Object.entries(fullComm.verses)) {
+          this.fullCommentaryMap.set(k, v);
+        }
+      }
           this.renderCommentaryTabs();
           this.renderInstalledModulesList();
         }
