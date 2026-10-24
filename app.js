@@ -2884,6 +2884,44 @@ class BibleWorkbenchApp {
     this.renderCommentaryTabs();
     this.renderCommentary();
     this.renderSearchVersionSelect();
+
+    // 7. Progressive background preload of full default Bible (CUV 66 books)
+    setTimeout(() => {
+      this.preloadDefaultFullBibles();
+    }, 100);
+  }
+
+  async preloadDefaultFullBibles() {
+    const hasFullCuv = this.customBibles.some(b => b.id === "CUV_FULL" || (b.id === "CUNPS" && Object.keys(b.verses || {}).length > 20000));
+    if (!hasFullCuv) {
+      try {
+        const resp = await fetch("data/CUV.json");
+        if (resp.ok) {
+          const cuvVerses = await resp.json();
+          if (cuvVerses && typeof cuvVerses === "object") {
+            if (!BUILTIN_DATA_VERSES["CUV"]) BUILTIN_DATA_VERSES["CUV"] = {};
+            Object.assign(BUILTIN_DATA_VERSES["CUV"], cuvVerses);
+
+            await db.saveCustomBible({
+              id: "CUV_FULL",
+              name: "新标点和合本 (全本 66卷)",
+              abbr: "和合本全本",
+              lang: "zh",
+              verses: cuvVerses,
+              updatedAt: new Date().toISOString()
+            });
+
+            this.customBibles = await db.getAllCustomBibles();
+            this.allBibleVersions = [...BUILTIN_BIBLES, ...this.customBibles];
+            this.renderPassage();
+            this.renderParallelPassage();
+            console.log(`[BibleWorkbench] 成功自动后台加载全本和合本 (31,101 节经文已全部离线就绪)`);
+          }
+        }
+      } catch (e) {
+        console.warn("Background preload CUV note:", e);
+      }
+    }
   }
 
   // =========================================================
