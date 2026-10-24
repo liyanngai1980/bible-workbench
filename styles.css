@@ -2284,8 +2284,24 @@ body[data-force-mobile="true"].mobile-view-stack .draggable-panel {
 
 
 /* Ensure hidden panels always stay hidden regardless of layout mode */
-.draggable-panel.panel-hidden {
+/* Ensure hidden panels ALWAYS stay hidden regardless of layout mode, specificity, or mobile stack */
+.panel-hidden,
+.draggable-panel.panel-hidden,
+body .draggable-panel.panel-hidden,
+body.mobile-view-stack .draggable-panel.panel-hidden,
+body:not([data-force-desktop="true"]).mobile-view-stack .draggable-panel.panel-hidden,
+body[data-force-mobile="true"].mobile-view-stack .draggable-panel.panel-hidden,
+[data-panel-id].panel-hidden {
   display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  max-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  opacity: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
 }
 
 @keyframes cardJumpPulse {

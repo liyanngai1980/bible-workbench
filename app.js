@@ -3771,15 +3771,16 @@ class BibleWorkbenchApp {
 
     // Panel close/collapse buttons
     document.querySelectorAll(".panel-close-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
         const panelId = btn.dataset.closePanel;
         const panel = document.getElementById(`panel-${panelId}`);
         if (panel) {
           panel.classList.add("panel-hidden");
-          panel.style.display = "none";
+          panel.style.setProperty("display", "none", "important");
           this.updatePanelTogglesUi();
           this.saveCustomPanelLayout();
-          showToast(`已收起【${this.getPanelTitle(panelId)}】窗口`, "ℹ️");
+          showToast(`已收起【${this.getPanelTitle(panelId)}】窗口 (点击下方标签可重新展开)`, "ℹ️");
         }
       });
     });
@@ -3799,8 +3800,15 @@ class BibleWorkbenchApp {
         btn.addEventListener("click", () => {
           const p = document.getElementById(pId);
           if (p) {
-            const isHidden = (p.style.display === "none");
-            p.style.display = isHidden ? "flex" : "none";
+            const isHidden = p.classList.contains("panel-hidden") || p.style.display === "none";
+            if (isHidden) {
+              p.classList.remove("panel-hidden");
+              p.style.removeProperty("display");
+              p.style.display = "flex";
+            } else {
+              p.classList.add("panel-hidden");
+              p.style.setProperty("display", "none", "important");
+            }
             btn.classList.toggle("active", isHidden);
             this.saveCustomPanelLayout();
           }
@@ -3937,6 +3945,7 @@ class BibleWorkbenchApp {
       if (targetPanel) {
         // If it was hidden, unhide it!
         targetPanel.classList.remove("panel-hidden");
+        targetPanel.style.removeProperty("display");
         targetPanel.style.display = "flex";
 
         setTimeout(() => {
@@ -3983,9 +3992,10 @@ class BibleWorkbenchApp {
     const order = [];
     panels.forEach(p => {
       const pid = p.dataset.panelId || p.id.replace("panel-", "");
+      const isHidden = p.classList.contains("panel-hidden") || p.style.display === "none";
       order.push({
         id: pid,
-        visible: p.style.display !== "none"
+        visible: !isHidden
       });
     });
 
@@ -4005,9 +4015,13 @@ class BibleWorkbenchApp {
       order.forEach(item => {
         const panel = document.getElementById(`panel-${item.id}`);
         if (panel) {
-          container.appendChild(panel); // re-append in saved order
+          container.appendChild(panel);
           if (item.visible === false) {
-            panel.style.display = "none";
+            panel.classList.add("panel-hidden");
+            panel.style.setProperty("display", "none", "important");
+          } else {
+            panel.classList.remove("panel-hidden");
+            panel.style.removeProperty("display");
           }
         }
       });
@@ -4031,7 +4045,8 @@ class BibleWorkbenchApp {
       const btn = document.getElementById(btnId);
       const p = document.getElementById(pId);
       if (btn && p) {
-        btn.classList.toggle("active", p.style.display !== "none");
+        const isHidden = p.classList.contains("panel-hidden") || p.style.display === "none";
+        btn.classList.toggle("active", !isHidden);
       }
     });
   }
